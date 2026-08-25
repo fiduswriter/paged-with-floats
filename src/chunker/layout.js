@@ -778,7 +778,7 @@ class Layout {
 		extract = true,
 	) {
 		let breakToken,
-			overflow = [];
+				overflow = [];
 
 		let overflowResult = this.findOverflow(rendered, bounds, source);
 		while (overflowResult) {
@@ -990,7 +990,7 @@ class Layout {
 		let result = undefined;
 		let skipRange = false;
 		let parentBottomPaddingBorder = 0,
-			parentBottomMargin = 0;
+				parentBottomMargin = 0;
 
 		if (isElement(node)) {
 			let result = this.getAncestorPaddingBorderAndMarginSums(node);
@@ -1008,12 +1008,11 @@ class Layout {
 
 			if (isElement(child)) {
 				let styles = window.getComputedStyle(child);
-				let skipThis = false;
 
 				bottomMargin = parseInt(styles["margin-bottom"]);
 
 				if (child.dataset.rangeStartOverflow !== undefined) {
-					skipRange = skipThis = true;
+					skipRange = true;
 					result = null;
 					// Don't continue. The start may also be the end.
 				}
@@ -1110,7 +1109,7 @@ class Layout {
 
 	startOfNewOverflow(node, rendered, bounds) {
 		let childNode,
-			done = false;
+				done = false;
 		let prev;
 		let anyOverflowFound = false;
 		let topNode = node;
@@ -1130,9 +1129,8 @@ class Layout {
 					// In the former case, we want to ignore this node and take the
 					// sibling. In the later case, we want to move this node.
 					let intrinsicBottom = 0,
-						intrinsicRight = 0;
+							intrinsicRight = 0;
 					let childBounds = getBoundingClientRect(node);
-					let styles;
 					if (isElement(node)) {
 						// Assume that any height is the result of matching the
 						// height of surrounding content if there's no content.
@@ -1436,8 +1434,8 @@ class Layout {
 		// overflow. There may be others. We just take the first we find and
 		// are called again to check for additional instances.
 		let node = rendered,
-			startOfOverflow,
-			check;
+				startOfOverflow,
+				check;
 
 		while (isText(node)) {
 			node = node.nextElementSibling;
@@ -1523,7 +1521,7 @@ class Layout {
 			}
 
 			let sibling = check,
-				siblingBounds;
+					siblingBounds;
 			do {
 				sibling = sibling.nextSibling;
 				siblingBounds = sibling ? getBoundingClientRect(sibling) : undefined;

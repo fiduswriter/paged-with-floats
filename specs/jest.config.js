@@ -1,9 +1,9 @@
 export default {
 	testMatch: ["**/?(*.)(spec).js?(x)"],
-	globalSetup: "./jest_helpers/setup.js",
-	globalTeardown: "./jest_helpers/teardown.js",
-	testEnvironment: "./jest_helpers/puppeteer_environment.js",
-	setupFilesAfterEnv: ["./jest_helpers/setup_tests.js"],
+	globalSetup: "./jest_helpers/setup.cjs",
+	globalTeardown: "./jest_helpers/teardown.cjs",
+	testEnvironment: "./jest_helpers/puppeteer_environment.cjs",
+	setupFilesAfterEnv: ["./jest_helpers/setup_tests.cjs"],
 	transform: {
 		"\\.js$": ["babel-jest", { configFile: "./babel-jest.config.json" }]
 	},

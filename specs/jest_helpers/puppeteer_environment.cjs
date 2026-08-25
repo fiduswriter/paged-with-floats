@@ -1,9 +1,7 @@
-import chalk from "chalk";
-import { TestEnvironment } from "jest-environment-node";
-// import puppeteer from "puppeteer";
-import { chromium } from "playwright-core";
-import fs from "fs";
-import { WS_ENDPOINT_PATH, DEBUG, ORIGIN, PDF_SETTINGS } from "./constants.js";
+const fs = require("fs");
+const { TestEnvironment } = require("jest-environment-node");
+const { chromium } = require("playwright-core");
+const { WS_ENDPOINT_PATH, DEBUG, ORIGIN, PDF_SETTINGS } = require("./constants.cjs");
 
 class PuppeteerEnvironment extends TestEnvironment {
 	constructor(config) {
@@ -11,16 +9,12 @@ class PuppeteerEnvironment extends TestEnvironment {
 	}
 
 	async setup() {
-		// eslint-disable-next-line no-console
-		DEBUG && console.log(chalk.yellow("Setup Test Environment."));
+		DEBUG && console.log("Setup Test Environment.");
 		await super.setup();
 		const wsEndpoint = fs.readFileSync(WS_ENDPOINT_PATH, "utf8");
 		if (!wsEndpoint) {
 			throw new Error("wsEndpoint not found");
 		}
-		// this.global.browser = await chromium.connect({
-		// 	browserWSEndpoint: wsEndpoint
-		// });
 		this.global.browser = await chromium.connect(wsEndpoint);
 
 		this.global.loadPage = this.loadPage.bind(this);
@@ -31,8 +25,7 @@ class PuppeteerEnvironment extends TestEnvironment {
 	}
 
 	async teardown() {
-		// eslint-disable-next-line no-console
-		DEBUG && console.log(chalk.yellow("Teardown Test Environment."));
+		DEBUG && console.log("Teardown Test Environment.");
 		await super.teardown();
 	}
 
@@ -63,6 +56,11 @@ class PuppeteerEnvironment extends TestEnvironment {
 		});
 
 		page.on("requestfailed", (error) => {
+			console.error(
+				"REQFAIL",
+				error.url(),
+				error.failure() && error.failure().errorText,
+			);
 			this.handleError(error);
 			renderedReject(error);
 		});
@@ -80,9 +78,10 @@ class PuppeteerEnvironment extends TestEnvironment {
 			let log;
 			if (type === "warning") {
 				log = console.warn;
+			} else if (type === "error") {
+				log = console.error;
 			} else {
-				// eslint-disable-next-line no-console
-				log = console[msg.type()];
+				log = console.log;
 			}
 			log.apply(this, args);
 		});
@@ -106,4 +105,4 @@ class PuppeteerEnvironment extends TestEnvironment {
 	}
 }
 
-export default PuppeteerEnvironment;
+module.exports = PuppeteerEnvironment;

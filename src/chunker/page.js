@@ -55,6 +55,8 @@ class Page {
 		let pagebox = page.querySelector(".pagedjs_pagebox");
 		let area = page.querySelector(".pagedjs_page_content");
 		let footnotesArea = page.querySelector(".pagedjs_footnote_area");
+		let floatTopArea = page.querySelector(".pagedjs_float_top");
+		let floatBottomArea = page.querySelector(".pagedjs_float_bottom");
 
 		let size = area.getBoundingClientRect();
 
@@ -69,6 +71,8 @@ class Page {
 		this.pagebox = pagebox;
 		this.area = area;
 		this.footnotesArea = footnotesArea;
+		this.floatTopArea = floatTopArea;
+		this.floatBottomArea = floatBottomArea;
 
 		return page;
 	}
@@ -80,7 +84,7 @@ class Page {
 	 */
 	createWrapper() {
 		let wrapper = document.createElement("div");
-		this.area.appendChild(wrapper);
+		this.area.insertBefore(wrapper, this.floatBottomArea);
 		this.wrapper = wrapper;
 		return wrapper;
 	}

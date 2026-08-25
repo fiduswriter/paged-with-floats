@@ -215,7 +215,7 @@ class Sheet {
 				if (
 					(node.value.type === "Raw" && content.startsWith("data:")) ||
 					(node.value.type === "String" &&
-						(content.startsWith('"data:') || content.startsWith("'data:")))
+						(content.startsWith("\"data:") || content.startsWith("'data:")))
 				) {
 					// Skip data URIs
 				} else {

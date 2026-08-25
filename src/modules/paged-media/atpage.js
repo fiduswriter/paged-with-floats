@@ -2057,10 +2057,9 @@ class AtPage extends Handler {
 		let thisPage = chunker.pages[chunker.pages.length - 1];
 		// If only footnotes were added, attribs should be like the previous page.
 		let emptyBody =
-			!thisPage.area.firstElementChild ||
-			!thisPage.area.firstElementChild.childElementCount ||
-			!thisPage.area.firstElementChild.firstElementChild.getBoundingClientRect()
-				.height;
+			!thisPage.wrapper ||
+			!thisPage.wrapper.childElementCount ||
+			!thisPage.wrapper.firstElementChild.getBoundingClientRect().height;
 		let emptyFootnotes =
 			!thisPage.footnotesArea.firstElementChild.childElementCount ||
 			!thisPage.footnotesArea.firstElementChild.firstElementChild.getBoundingClientRect()

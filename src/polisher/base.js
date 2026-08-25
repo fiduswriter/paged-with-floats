@@ -389,8 +389,24 @@ export default `
 	column-fill: auto;
 }
 
-.pagedjs_pagebox > .pagedjs_area > .pagedjs_page_content > div {
+.pagedjs_pagebox > .pagedjs_area > .pagedjs_page_content > div:not(.pagedjs_float_top):not(.pagedjs_float_bottom) {
 	height: inherit;
+}
+
+.pagedjs_pagebox > .pagedjs_area > .pagedjs_page_content > .pagedjs_float_top,
+.pagedjs_pagebox > .pagedjs_area > .pagedjs_page_content > .pagedjs_float_bottom {
+	display: flow-root;
+}
+
+.pagedjs_pagebox > .pagedjs_area > .pagedjs_page_content > .pagedjs_float_top {
+	width: 100%;
+}
+
+.pagedjs_pagebox > .pagedjs_area > .pagedjs_page_content > .pagedjs_float_bottom {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
 }
 
 .pagedjs_pagebox > .pagedjs_area > .pagedjs_footnote_area {

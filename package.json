@@ -1,10 +1,65 @@
 {
-  "name": "pagedjs",
-  "version": "0.5.0-beta.2",
-  "description": "Chunks up a document into paged media flows and applies print styles",
-  "author": "Fred Chasen",
-  "license": "MIT",
-  "homepage": "https://pagedmedia.org",
+  "name": "paged-with-floats",
+  "version": "0.6.1",
+  "description": "Fork of Paged.js: chunks up a document into paged media flows, applies print styles, and adds support for CSS page floats",
+  "author": "Johannes Wilm",
+  "maintainers": [
+    {
+      "name": "Johannes Wilm"
+    }
+  ],
+  "contributors": [
+    "Fred Chasen",
+    "Julien Taquet",
+    "Guillaume Grossetie",
+    "Julie Blanc",
+    "Nellie McKesson",
+    "Martin Heini",
+    "Thomas Parisot",
+    "Antonin Libotte",
+    "Erik Schilling",
+    "Marius Dumitru Florea",
+    "Nigel Cunningham",
+    "William Muir",
+    "Martin Olsson",
+    "Nathan Schulzke",
+    "Gijs de Heij",
+    "Andrey Kislyuk",
+    "Angela Liu",
+    "Chris Beaven",
+    "Edoardo Tona",
+    "JenniferVdL",
+    "Jonathan Boarman",
+    "Lucas Willems",
+    "Malte Rohde",
+    "Mauro Bieg",
+    "Nicholas Wylie",
+    "Patrick Kranz",
+    "Rob Mayer",
+    "Sam Ruby",
+    "Stéphane Elbaron",
+    "Talbi Youssef",
+    "Urban Suppiger",
+    "Yann Trividic",
+    "Antoine Fauchié",
+    "mb21",
+    "wangfengming",
+    "wenbei421"
+  ],
+  "license": "LGPL-3.0-or-later",
+  "homepage": "https://github.com/johanneswilm/paged-with-floats#readme",
+  "bugs": {
+    "url": "https://github.com/johanneswilm/paged-with-floats/issues"
+  },
+  "keywords": [
+    "pagination",
+    "paged-media",
+    "css",
+    "print",
+    "page-floats",
+    "pdf",
+    "browser"
+  ],
   "main": "src/index.js",
   "browser": "dist/paged.js",
   "type": "module",
@@ -36,10 +91,10 @@
     "chalk": "^5.2.0",
     "eslint": "^8.38.0",
     "express": "^4.18.2",
-    "jest": "^29.5.0",
-    "jest-environment-jsdom": "^29.5.0",
-    "jest-image-snapshot": "^6.1.0",
-    "playwright-core": "^1.32.3",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
+    "jest-image-snapshot": "^6.5.2",
+    "playwright-core": "1.62.1",
     "rimraf": "^5.0.0",
     "rollup": "^3.20.6",
     "rollup-plugin-license": "^3.0.1",
@@ -48,7 +103,6 @@
     "rollup-plugin-serve": "^2.0.2"
   },
   "scripts": {
-    "generate-docs": "jsdoc -c ./jsdoc.json",
     "build": "rollup -c",
     "start": "rollup -w -c rollup.server.config.js",
     "test": "npm run lint && jest",
@@ -59,18 +113,20 @@
     "prepublishOnly": "npm run build && npm run compile && npm run legacy",
     "watch": "rollup -w -c",
     "lint": "eslint -c .eslintrc.json src specs",
-    "docker-build": "docker build -t pagedmedia/pagedjs .",
-    "docker-test": "docker build -t pagedmedia/pagedjs . && docker run -it --rm --ipc=host --user pwuser --security-opt 'seccomp=seccomp.json' -v $(pwd)/specs:/home/pwuser/pagedjs/specs pagedmedia/pagedjs npm test",
-    "docker-specs": "docker build -t pagedmedia/pagedjs . && docker run -it --rm --ipc=host -v $(pwd)/specs:/home/pwuser/pagedjs/specs pagedmedia/pagedjs npm run specs",
-    "docker-update-specs": "docker build -t pagedmedia/pagedjs . && docker run -it --rm --ipc=host -v $(pwd)/specs:/home/pwuser/pagedjs/specs pagedmedia/pagedjs npm run specs -- -u"
+    "specs-dom": "jest --config=specs/jest.config.js page-floats data64 filters/undisplayed filters/script-elements splits/tables/long-table whitespaces/whitespaces.spec.js",
+    "docker-specs": "docker build -t paged-with-floats . && docker run --rm --ipc=host -v $(pwd)/specs:/home/pwuser/pagedjs/specs paged-with-floats npm run specs",
+    "docker-update-specs": "docker build -t paged-with-floats . && docker run --rm --ipc=host -v $(pwd)/specs:/home/pwuser/pagedjs/specs paged-with-floats npm run specs -- -u"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pagedjs/pagedjs.git"
+    "url": "https://github.com/johanneswilm/paged-with-floats.git"
   },
   "files": [
     "dist",
     "lib",
-    "src"
+    "src",
+    "LICENSE.md",
+    "COPYING",
+    "COPYING.LESSER"
   ]
 }

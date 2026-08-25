@@ -274,8 +274,8 @@ function copyWidth(originalElement, destElement) {
  */
 export function rebuildTableRow(node, alreadyRendered, existingChildren) {
 	let currentCol = 0,
-		maxCols = 0,
-		nextInitialColumn = 0;
+			maxCols = 0,
+			nextInitialColumn = 0;
 	let rebuilt = node.cloneNode(false);
 	const initialColumns = Array.from(node.children);
 
@@ -300,7 +300,6 @@ export function rebuildTableRow(node, alreadyRendered, existingChildren) {
 	// Duplicate rowspans and our initial columns.
 	while (currentCol < maxCols) {
 		let earlierRow = node.parentElement.children[0];
-		let earlierRowIndex = 0;
 		let rowspan, column;
 		// Find the nth column we'll duplicate (rowspan) or use.
 		while (earlierRow && earlierRow !== node) {
@@ -321,7 +320,6 @@ export function rebuildTableRow(node, alreadyRendered, existingChildren) {
 				}
 			}
 			earlierRow = earlierRow.nextElementSibling;
-			earlierRowIndex++;
 		}
 
 		let destColumn;
@@ -418,9 +416,8 @@ export function rebuildTree(node, fragment, alreadyRendered) {
 
 			while (sibling) {
 				let existing = findElement(sibling, container),
-					siblingClone;
+						siblingClone;
 				if (!existing) {
-					let split = inIndexOfRefs(subject, alreadyRendered);
 					siblingClone = cloneNodeAncestor(sibling);
 					if (alreadyRendered) {
 						let originalElement = findElement(sibling, alreadyRendered);
@@ -462,7 +459,7 @@ export function rebuildTree(node, fragment, alreadyRendered) {
 			let sibling = subject.previousElementSibling;
 
 			let existing = findElement(sibling, container),
-				siblingClone;
+					siblingClone;
 			if (!existing) {
 				siblingClone = cloneNodeAncestor(sibling, true);
 				if (alreadyRendered) {
@@ -483,19 +480,15 @@ export function rebuildTree(node, fragment, alreadyRendered) {
 								// I could achieve. It gets a zero height but still somehow
 								// affects the container height by a couple of pixels in my
 								// testing. :(
-								// Next step is to change the "true" below to use a custom
-								// attribute that lets you control whether the header is shown.
-								if (true) {
-									pos.style.visibility = "collapse";
-									pos.style.marginTop = "0px";
-									pos.style.marginBottom = "0px";
-									pos.style.paddingTop = "0px";
-									pos.style.paddingBottom = "0px";
-									pos.style.borderTop = "0px";
-									pos.style.borderBottom = "0px";
-									pos.style.lineHeight = "0px";
-									pos.style.opacity = 0;
-								}
+								pos.style.visibility = "collapse";
+								pos.style.marginTop = "0px";
+								pos.style.marginBottom = "0px";
+								pos.style.paddingTop = "0px";
+								pos.style.paddingBottom = "0px";
+								pos.style.borderTop = "0px";
+								pos.style.borderBottom = "0px";
+								pos.style.lineHeight = "0px";
+								pos.style.opacity = 0;
 							}
 						}
 					}

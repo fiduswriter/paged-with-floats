@@ -68,7 +68,6 @@ class PageCounterIncrement extends Handler {
 	afterParsed(_) {
 		for (const inc in this.pageCounter.increments) {
 			const increment = this.pageCounter.increments[inc];
-			console.log(increment); // Debug logging
 			this.insertRule(
 				`${increment.selector} { --pagedjs-page-counter-increment: ${increment.number} }`,
 			);

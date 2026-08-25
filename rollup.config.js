@@ -3,8 +3,10 @@ import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
 import terser from "@rollup/plugin-terser";
 import license from "rollup-plugin-license";
+import { createRequire } from "module";
 
-import pkg from "./package.json" assert { type: "json" };
+const require = createRequire(import.meta.url);
+const pkg = require("./package.json");
 
 const plugins = [
 	nodeResolve({
@@ -16,7 +18,15 @@ const plugins = [
 	json(),
 	license({
 		banner:
-			"@license Paged.js v<%= pkg.version %> | MIT | https://github.com/pagedjs/pagedjs",
+			" @license paged-with-floats v<%= pkg.version %>\n" +
+			"\n" +
+			" Modifications and additions in this build are Copyright (C) 2026 Johannes Wilm\n" +
+			" and licensed under the GNU Lesser General Public License, version 3 or later\n" +
+			" (LGPL-3.0-or-later). See COPYING.LESSER and LICENSE.md for details.\n" +
+			"\n" +
+			" Contains substantial portions of Paged.js, licensed under the MIT License:\n" +
+			" Copyright (c) 2018 Adam Hyde. This notice is retained as required by that\n" +
+			" license. See LICENSE.md for the full license text.",
 	}),
 ];
 

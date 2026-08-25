@@ -71,7 +71,10 @@ const TEMPLATE = `
 				<div class="pagedjs_margin pagedjs_margin-bottom-right-corner"><div class="pagedjs_margin-content"></div></div>
 			</div>
 			<div class="pagedjs_area">
-				<div class="pagedjs_page_content"></div>
+				<div class="pagedjs_page_content">
+					<div class="pagedjs_float_top"></div>
+					<div class="pagedjs_float_bottom"></div>
+				</div>
 				<div class="pagedjs_footnote_area">
 					<div class="pagedjs_footnote_content pagedjs_footnote_empty">
 						<div class="pagedjs_footnote_inner_content"></div>
@@ -523,14 +526,10 @@ class Chunker {
 			(MAX_PAGES ? this.total < MAX_PAGES : true)
 		) {
 			let range;
-			if (
-				page &&
-				page.area.firstElementChild &&
-				page.area.firstElementChild.childElementCount
-			) {
+			if (page && page.wrapper && page.wrapper.childElementCount) {
 				range = document.createRange();
-				range.selectNode(page.area.firstElementChild.childNodes[0]);
-				range.setEndAfter(page.area.firstElementChild.lastChild);
+				range.selectNode(page.wrapper.childNodes[0]);
+				range.setEndAfter(page.wrapper.lastChild);
 			}
 
 			let addedExtra = false;
