@@ -3,58 +3,110 @@
 <head>
 	<meta charset="utf-8">
 	<title>paged-with-floats — demos</title>
-	<style>
-		body {
-			font-family: Georgia, "Times New Roman", serif;
-			max-width: 46rem;
-			margin: 3rem auto;
-			padding: 0 1.5rem;
-			color: #1a1a1a;
-			line-height: 1.5;
-		}
-		h1 { font-size: 1.9rem; border-bottom: 3px solid #222; padding-bottom: .4rem; }
-		h2 { font-size: 1.15rem; margin-top: 2rem; color: #444; }
-		li { margin: .45rem 0; }
-		a { color: #0b5394; }
-		code { background: #f2f2f2; padding: .1rem .35rem; border-radius: 3px; font-size: .9em; }
-		.note { font-size: .85em; color: #666; }
-	</style>
+	<meta name="description" content="Live demonstrations of paged-with-floats: page floats, footnotes, multi-column pagination and PDF export.">
+	<link rel="icon" href="data:,">
+	<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-<h1>paged-with-floats demos</h1>
-<p>Live demonstrations of <code>paged-with-floats</code>, an LGPL fork of
-Paged.js with CSS page floats, footnotes, multi-column pagination,
-running headers and page numbers.</p>
+<header class="site-header">
+	<img src="../assets/logo.svg" alt="paged-with-floats logo">
+	<span class="site-name">paged-with-floats</span>
+	<nav>
+		<a href="../">Home</a>
+		<a href="https://github.com/johanneswilm/paged-with-floats">GitHub</a>
+	</nav>
+</header>
 
-<h2>Floating figures in a two-column book — editable playground</h2>
-<ul>
-	<li><a href="multicol-floats.html">The Malay Archipelago</a> —
-	two-column flow with page floats (<code>float-reference: page;
-	float: top</code>) spanning both columns, footnotes collected at the
-	bottom of the page, running chapter headers and page numbers.
-	<strong>Edit the HTML source in the textarea</strong>, then hit
-	“Render pages” to re-paginate, or “Download PDF” to export the current
-	source as a real vector PDF.</li>
-</ul>
+<main>
+	<section class="hero">
+		<h1>Demos</h1>
+		<p class="lede">Live demonstrations of <strong>paged-with-floats</strong>:
+		CSS page floats, footnotes, multi-column pagination, running headers
+		and page numbers — paginated entirely in the browser.</p>
+	</section>
 
-<h2>Whole books in two to four columns</h2>
-<p class="note">Full Project Gutenberg texts (public domain) paginated
-entirely in the browser. Running headers show the current chapter via
-<code>string-set</code>; footers carry page numbers. Each page offers a
-one-click <strong>Download PDF</strong> export.</p>
-<ul>
-	<li><a href="books/alice-2col.html">Alice’s Adventures in Wonderland</a>
-	— Lewis Carroll, two columns.</li>
-	<li><a href="books/frankenstein-3col.html">Frankenstein</a> — Mary
-	Wollstonecraft Shelley, three columns.</li>
-	<li><a href="books/moby-4col.html">Moby-Dick</a> — Herman Melville,
-	four columns.</li>
-</ul>
+	<p class="group-title">Editable playground</p>
+	<section class="cards">
+		<a class="card" href="multicol-floats.html">
+			<div class="thumb"><img src="assets/images/map-of-malay-archipelago-wallace-1869.jpg" alt="Fold-out map from Wallace's The Malay Archipelago"></div>
+			<div class="body">
+				<h2>The Malay Archipelago</h2>
+				<p>Two-column flow with page floats
+				(<code>float-reference: page; float: top</code>) spanning both
+				columns, footnotes at the page bottom, running chapter heads.
+				Edit the HTML source in the textarea, then hit “Render pages”
+				or “Download PDF”.</p>
+				<span class="tag">Editable · PDF export</span>
+			</div>
+		</a>
+	</section>
 
-<h2>About</h2>
-<p><a href="https://github.com/johanneswilm/paged-with-floats">Repository
-and README</a>. The PDF export demo lives in
-<code>examples/measurement-benchmark.html</code>; the print/PDF APIs are
-documented in the README under “Print &amp; PDF export”.</p>
+	<p class="group-title">Whole books in two to four columns</p>
+	<section class="cards">
+		<a class="card" href="books/alice-2col.html">
+			<div class="thumb letter" style="background:linear-gradient(135deg,#e3f2f4,#cfe7ea);color:#087f90;">Aa</div>
+			<div class="body">
+				<h2>Alice’s Adventures in Wonderland</h2>
+				<p>Lewis Carroll, two columns.</p>
+				<span class="tag">2 columns</span>
+			</div>
+		</a>
+		<a class="card" href="books/frankenstein-3col.html">
+			<div class="thumb letter" style="background:linear-gradient(135deg,#ece4d4,#d9cdb4);color:#6d5a32;">Ff</div>
+			<div class="body">
+				<h2>Frankenstein</h2>
+				<p>Mary Wollstonecraft Shelley, three columns.</p>
+				<span class="tag">3 columns</span>
+			</div>
+		</a>
+		<a class="card" href="books/moby-4col.html">
+			<div class="thumb letter" style="background:linear-gradient(135deg,#dde4ee,#c3cede);color:#33415e;">Mm</div>
+			<div class="body">
+				<h2>Moby-Dick</h2>
+				<p>Herman Melville, four columns.</p>
+				<span class="tag">4 columns</span>
+			</div>
+		</a>
+	</section>
+
+	<p class="group-title">Ornamented specimen book</p>
+	<section class="cards">
+		<a class="card" href="previewer.html">
+			<div class="thumb"><img src="assets/aurorae/images/cover.jpg" alt="Gilt and blue cover of Auroræ: Their Characters and Spectra"></div>
+			<div class="body">
+				<h2>Auroræ — Their Characters and Spectra</h2>
+				<p>J. Rand Capron’s 1886 aurora monograph, a Victorian
+				sample book with gilt cover, plates, initials and ornaments,
+				paginated through the previewer API.</p>
+				<span class="tag">Previewer API</span>
+			</div>
+		</a>
+	</section>
+
+	<p class="group-title">Print &amp; PDF export</p>
+	<section class="cards">
+		<a class="card" href="measurement-benchmark.html">
+			<div class="thumb letter" style="background:linear-gradient(135deg,#efe6df,#e0cfc2);color:#8a4b32;">Pp</div>
+			<div class="body">
+				<h2>Measurement benchmark</h2>
+				<p>Stress-test the text-breaking backends and export the
+				result as a real vector PDF. The print/PDF APIs are documented
+				in the README under “Print &amp; PDF export”.</p>
+				<span class="tag">Print &amp; PDF</span>
+			</div>
+		</a>
+	</section>
+
+	<p class="note">Full Project Gutenberg texts (public domain). Running
+	headers show the current chapter via <code>string-set</code>; footers
+	carry page numbers. Each book page offers a one-click PDF download.</p>
+</main>
+
+<footer class="site-footer">
+	<div>
+		<span><a href="https://github.com/johanneswilm/paged-with-floats">Repository and README</a></span>
+		<span><a href="https://github.com/johanneswilm/paged-with-floats/tree/main/specs">Specs</a></span>
+	</div>
+</footer>
 </body>
 </html>

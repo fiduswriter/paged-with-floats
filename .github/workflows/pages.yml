@@ -35,8 +35,10 @@ jobs:
           mkdir -p site
           cp -r dist site/dist
           cp -r examples site/examples
-          # Landing page at the site root.
-          cp site/examples/index.html site/index.html
+
+          cp -r assets site/assets
+          # Landing page at the site root; its links point into examples/.
+          cp index.html site/index.html
 
       - uses: actions/configure-pages@v5
 

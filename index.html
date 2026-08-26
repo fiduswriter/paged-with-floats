@@ -1,85 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width">
-	<title>paged-with-floats — Specs and Examples</title>
-
-  <style>
-    body *, body * * {
-      box-sizing: border-box;
-    }
-    body {
-      font-size: 1.2em;
-      margin: 2em;
-      font-family: sans-serif;
-    }
-    h1,h2,h3 {
-      font-weight: 300;
-      margin:0;
-      margin-bottom: 2em;
-      margin-top: 1.3em;
-    }
-    h2 {
-      font-size: 1.2em;
-      margin-bottom: .4em;
-    }
-    section {
-      margin-bottom: 3em;
-    }
-    section > ul {
-      display: flex; 
-      flex-wrap: wrap;
-      gap: 5ch;
-    }
-    section ul {
-      list-style-type: none;
-    }
-    section li > ul {
-      padding-left: 1ch;
-    }
-    section > ul > li > ul > li {
-      min-width: 40ch; 
-      margin-bottom: .3em;
-    }
-
-
-    li a {
-      color: #0da6ba;
-      /* text-decoration-color: ; */
-      text-underline-offset: 3px;
-    }
-
-    li a:hover {
-      color: black;
-      background: #dcf4f7;
-    }
-
-    ul ul {
-      border-left: 2px solid grey;
-      padding-top:0;
-    }
-  </style>
-
+	<title>paged-with-floats — print-quality pagination in the browser</title>
+	<meta name="description" content="paged-with-floats: a Paged.js fork with CSS page floats, footnotes, running headers, multi-column pagination and vector PDF export.">
+	<link rel="icon" href="data:,">
+	<link rel="stylesheet" href="examples/assets/site.css">
 </head>
 <body>
-	<h1>Pagedjs</h1>
-	<section>
-    <h2>Pagedjs examples</h2>
-	<ul>
-		<li><a href="examples/index.html">Moby Dick (1-50)</a></li>
-		<li><a href="examples/epub.html">Epub Loader</a></li>
-	</ul>
+<header class="site-header">
+	<img src="assets/logo.svg" alt="paged-with-floats logo">
+	<span class="site-name">paged-with-floats</span>
+	<nav>
+		<a href="examples/">Demos</a>
+		<a href="https://github.com/johanneswilm/paged-with-floats">GitHub</a>
+	</nav>
+</header>
+
+<main>
+	<section class="hero">
+		<h1>Print-quality pagination in the browser</h1>
+		<p class="lede"><strong>paged-with-floats</strong> is a Paged.js fork with
+		CSS page floats, footnotes, running headers, page numbers and
+		multi-column layout — plus real vector PDF export.</p>
+		<div class="btn-row">
+			<a class="btn" href="examples/">Browse the demos</a>
+		</div>
 	</section>
-	<section>
-    <h2>Pagedjs specs</h2>
-	<ul>
-		<li><a href="specs/">specifications for paged-with-floats</a></li>
-	</ul>
-	</section>
-</body>
-</html>
+</main>
 
-
-
-
+<footer class="site-footer">
+	<div>
+		<span>paged-with-floats — LGPL-licensed fork of
+		<a href="https://github.com/pagedjs/pagedjs">Paged.js</a></span>
+		<span><a href="https://github.com/johanneswilm/paged-with-floats">Repository</a> ·
+		<a href="https://github.com/johanneswilm/paged-with-floats/tree/main/specs">Specs</a></span>
+	</div>
+</footer>
 </body>
 </html>

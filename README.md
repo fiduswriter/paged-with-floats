@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/johanneswilm/paged-with-floats/actions/workflows/ci.yml/badge.svg)](https://github.com/johanneswilm/paged-with-floats/actions/workflows/ci.yml)
 
+**Live demos:** <https://johanneswilm.github.io/paged-with-floats/>
+
 paged-with-floats
 ===========
 

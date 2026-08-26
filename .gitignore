@@ -7,4 +7,4 @@ specs/**/*.pdf
 specs/temp
 .vscode
 docs/
-
+site/
