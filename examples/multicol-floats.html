@@ -128,11 +128,12 @@ window.PagedConfig = { auto: false };
 	<meta charset="UTF-8">
 	<title>The Malay Archipelago — floats in multicol</title>
 	<style>
-		/* Host-page preview styling only. The book's own CSS — including
-		   its root-level `body { column-count }` — lives in the editable
-		   source below and is processed by the polisher during pagination;
-		   the host document itself must never become a multicol container. */
+		/* Book CSS. Its root-level `body { column-count }` is captured by
+		   the polisher and realized as the page wrappers' columns; the
+		   host document itself must never become a multicol container. */
 		body {
+			column-count: 2;
+			column-gap: 10mm;
 			font-family: serif;
 		}
 

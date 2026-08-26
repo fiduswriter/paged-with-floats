@@ -94,16 +94,23 @@ class Page {
 		let footnotesArea = page.querySelector(
 			".paged_footnote_area",
 		) as HTMLElement | null;
-		let floatTopArea = page.querySelector(".paged_float_top") as Element | null;
-		let floatBottomArea = page.querySelector(
-			".paged_float_bottom",
-		) as Element | null;
 
 		let size = area.getBoundingClientRect();
 
-		area.style.columnWidth = Math.round(size.width) + "px";
-		area.style.columnGap =
-			"calc(var(--paged-margin-right) + var(--paged-margin-left) + var(--paged-bleed-right) + var(--paged-bleed-left) + var(--paged-column-gap-offset))";
+		// Single-column pages: the content area is a single-column multicol
+		// with an off-page spill column, so the flow wrapper and the top
+		// float container stack as multicol items — content is pushed below
+		// top floats and any overflow spills into the hidden column where
+		// the layout stage detects it. Manual-columns pages handle floats
+		// inside the flow host and must not fragment it.
+		const rootColumns = this.settings.rootColumns as
+			| { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string }
+			| undefined;
+		if (!(rootColumns && rootColumns.count > 1)) {
+			area.style.columnWidth = Math.round(size.width) + "px";
+			area.style.columnGap =
+				"calc(var(--paged-margin-right) + var(--paged-margin-left) + var(--paged-bleed-right) + var(--paged-bleed-left) + var(--paged-column-gap-offset))";
+		}
 
 		this.width = Math.round(size.width);
 		this.height = Math.round(size.height);
@@ -112,8 +119,17 @@ class Page {
 		this.pagebox = pagebox;
 		this.area = area;
 		this.footnotesArea = footnotesArea;
-		this.floatTopArea = floatTopArea;
-		this.floatBottomArea = floatBottomArea;
+		this.floatTopArea = page.querySelector(
+			".paged_float_top",
+		) as HTMLElement | null;
+		this.floatBottomArea = page.querySelector(
+			".paged_float_bottom",
+		) as HTMLElement | null;
+
+		// Build the flow host (with float containers) right away so hooks
+		// that run before layout (e.g. placing deferred floats) find them;
+		// layout()/clear() recreates it as needed.
+		this.createWrapper();
 
 		return page;
 	}
@@ -121,37 +137,98 @@ class Page {
 	/**
 	 * Creates a wrapper element inside the page's content area.
 	 *
-	 * When a root-level multicol configuration is present (via settings
-	 * `rootColumns`), the wrapper becomes the fragmentainer: the browser
-	 * fragments flow content into N visible columns and any content beyond
-	 * the last column spills into an additional off-page column, which the
-	 * layout stage detects as overflow.
+	 * Single-column pages keep the classic structure: a plain wrapper
+	 * between the template's float containers. Root-level multicol pages
+	 * use a *flow host* instead: the float containers move inside it and N
+	 * `.paged_column` boxes are built between them. Columns are cut and
+	 * positioned by the layout engine rather than the browser's
+	 * `column-count`, so measurement always matches the final rendering.
 	 *
 	 * @returns {HTMLElement} The wrapper element.
 	 */
 	createWrapper(): HTMLDivElement {
 		let wrapper = document.createElement("div");
+		wrapper.classList.add("paged_flow");
 
 		const rootColumns = this.settings.rootColumns as
 			| { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string }
 			| undefined;
-		if (rootColumns && rootColumns.count > 1) {
-			wrapper.style.columnCount = String(rootColumns.count);
-			wrapper.style.columnFill = "auto";
-			wrapper.style.columnGap =
-				rootColumns.gap !== undefined ? rootColumns.gap : "normal";
-			if (rootColumns.ruleWidth) {
-				wrapper.style.columnRuleStyle = rootColumns.ruleStyle || "solid";
-				wrapper.style.columnRuleWidth = rootColumns.ruleWidth;
-				if (rootColumns.ruleColor) {
-					wrapper.style.columnRuleColor = rootColumns.ruleColor;
-				}
+		const useManualColumns = !!(rootColumns && rootColumns.count > 1);
+
+		if (useManualColumns) {
+			// Move the template's float containers inside the flow host so
+			// the column boxes start below top floats and above bottom
+			// floats without relying on the outer content area fragmenting.
+			if (this.floatTopArea) {
+				wrapper.appendChild(this.floatTopArea);
+			} else {
+				let floatTopArea = document.createElement("div");
+				floatTopArea.classList.add("paged_float_top");
+				wrapper.appendChild(floatTopArea);
+				this.floatTopArea = floatTopArea;
 			}
+			this.buildManualColumns(wrapper, rootColumns);
+			if (this.floatBottomArea) {
+				wrapper.appendChild(this.floatBottomArea);
+			} else {
+				let floatBottomArea = document.createElement("div");
+				floatBottomArea.classList.add("paged_float_bottom");
+				wrapper.appendChild(floatBottomArea);
+				this.floatBottomArea = floatBottomArea;
+			}
+			this.area!.appendChild(wrapper);
+		} else {
+			// Single-column: classic plain wrapper between the float
+			// containers (which stay direct children of the content area).
+			this.area!.insertBefore(wrapper, this.floatBottomArea!);
 		}
 
-		this.area!.insertBefore(wrapper, this.floatBottomArea!);
 		this.wrapper = wrapper;
 		return wrapper;
+	}
+
+	/**
+	 * Populates the flow host with explicit column boxes.
+	 *
+	 * Each column is a plain block sized to `calc((100% - (N-1)*gap) / N)`
+	 * and laid out in a flex row; the engine fills them sequentially. The
+	 * host keeps `height: inherit` so the outer content area (and the page
+	 * float containers above it) fragment exactly as before.
+	 *
+	 * @param {HTMLDivElement} wrapper - The flow host.
+	 * @param {Object} rootColumns - Root column configuration.
+	 * @returns {void}
+	 */
+	private buildManualColumns(
+		wrapper: HTMLDivElement,
+		rootColumns: { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string },
+	): void {
+		const count = Math.floor(rootColumns.count);
+		const gap =
+			rootColumns.gap !== undefined && rootColumns.gap !== "normal"
+				? rootColumns.gap
+				: "1em";
+
+		wrapper.dataset.rootColumns = String(count);
+
+		const columnsHost = document.createElement("div");
+		columnsHost.classList.add("paged_columns");
+		columnsHost.style.gap = gap;
+
+		for (let i = 0; i < count; i++) {
+			const column = document.createElement("div");
+			column.classList.add("paged_column");
+			column.dataset.pagedColumn = String(i);
+			column.style.width = `calc((100% - ${count - 1} * ${gap}) / ${count})`;
+			if (i > 0 && rootColumns.ruleWidth) {
+				column.style.borderLeft =
+					`${rootColumns.ruleWidth} ${rootColumns.ruleStyle || "solid"}` +
+					(rootColumns.ruleColor ? ` ${rootColumns.ruleColor}` : "");
+			}
+			columnsHost.appendChild(column);
+		}
+
+		wrapper.appendChild(columnsHost);
 	}
 
 	/**
@@ -368,11 +445,42 @@ class Page {
 
 	/**
 	 * Clears the wrapper and listeners, resetting the layout state.
+	 *
+	 * For manual-columns pages the flow host and its float containers are
+	 * preserved (floats placed before layout must survive), while content
+	 * and column rows are removed and the columns rebuilt. Single-column
+	 * pages keep the classic full recreate.
 	 */
 	clear(): void {
 		this.removeListeners();
-		this.wrapper && this.wrapper.remove();
-		this.createWrapper();
+
+		const rootColumns = this.settings.rootColumns as
+			| { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string }
+			| undefined;
+		const useManualColumns = !!(rootColumns && rootColumns.count > 1);
+
+		if (!useManualColumns) {
+			this.wrapper && this.wrapper.remove();
+			this.createWrapper();
+			return;
+		}
+
+		if (!this.wrapper) {
+			this.createWrapper();
+			return;
+		}
+
+		Array.from(this.wrapper.children).forEach((child) => {
+			if (
+				!(child instanceof HTMLElement) ||
+				(!child.classList.contains("paged_float_top") &&
+					!child.classList.contains("paged_float_bottom"))
+			) {
+				child.remove();
+			}
+		});
+
+		this.buildManualColumns(this.wrapper, rootColumns);
 	}
 
 	/**

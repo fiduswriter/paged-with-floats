@@ -58,8 +58,13 @@ describe("page-floats-bottom-basic", () => {
 			let wrapper = content.querySelector(
 				":scope > div:not(.paged_float_top):not(.paged_float_bottom)"
 			);
+			// Measure the flow content only (the float containers now live
+			// inside the flow host, so exclude them from the range).
+			let flowContent = wrapper.querySelector(
+				":scope > .paged_columns, :scope > :not(.paged_float_top):not(.paged_float_bottom):not(.paged_float_spacer)"
+			);
 			let range = document.createRange();
-			range.selectNodeContents(wrapper);
+			range.selectNodeContents(flowContent || wrapper);
 			return range.getBoundingClientRect().bottom > figTop + 2;
 		});
 		expect(overlap).toBe(false);

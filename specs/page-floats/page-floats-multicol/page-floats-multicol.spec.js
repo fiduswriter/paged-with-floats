@@ -28,13 +28,14 @@ describe("page-floats-multicol", () => {
 			const floats = Array.from(document.querySelectorAll("[data-page-float]"));
 			return floats.map((f) => {
 				const pg = f.closest(".paged_page");
-				const wrap = pg.querySelector(
-					".paged_page_content > div:not(.paged_float_top):not(.paged_float_bottom)"
-				);
+				// The flow content is inside `.paged_column` boxes; a float
+				// leaked there would render as a column float.
+				const leaked =
+					!!pg.querySelector(".paged_columns [data-page-float]");
 				return {
 					id: f.id,
 					inTopContainer: !!f.parentElement.classList.contains("paged_float_top"),
-					insideWrapper: !!(wrap && wrap.contains(f)),
+					insideWrapper: leaked,
 					pageNumber: pg ? parseInt(pg.dataset.pageNumber, 10) : null,
 				};
 			});
@@ -57,13 +58,11 @@ describe("page-floats-multicol", () => {
 			if (!wrap || !fig) {
 				return { columnWidth: null, figureWidth: null };
 			}
-			const st = getComputedStyle(wrap);
-			const count = parseInt(st.columnCount) || 1;
-			let gap = parseFloat(st.columnGap);
-			if (Number.isNaN(gap)) gap = parseFloat(st.fontSize) || 0;
+			// Column width = width of one `.paged_column` box.
+			const col = wrap.querySelector(".paged_columns > .paged_column");
 			return {
-				columnCount: count,
-				columnWidth: ((wrap.clientWidth || 0) - (count - 1) * gap) / count,
+				columnCount: wrap.querySelectorAll(".paged_columns > .paged_column").length,
+				columnWidth: col ? col.getBoundingClientRect().width : 0,
 				figureWidth: fig.getBoundingClientRect().width,
 			};
 		});
@@ -71,11 +70,8 @@ describe("page-floats-multicol", () => {
 		expect(widths.figureWidth).toBeGreaterThan(widths.columnWidth);
 	});
 
-	it("should render no float copy inside the flow wrapper", async () => {
-		let leaked = await page.$$eval(
-			".paged_page_content > div:not(.paged_float_top):not(.paged_float-bottom) [data-page-float]",
-			(r) => r.length
-		);
+	it("should render no float copy inside the flow columns", async () => {
+		let leaked = await page.$$eval(".paged_columns [data-page-float]", (r) => r.length);
 		expect(leaked).toEqual(0);
 	});
 

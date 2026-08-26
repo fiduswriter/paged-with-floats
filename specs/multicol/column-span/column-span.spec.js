@@ -32,14 +32,21 @@ describe("multicol-column-span", () => {
 			const wrapper = content.querySelector(
 				":scope > div:not(.paged_float_top):not(.paged_float_bottom)",
 			);
-			const xs = new Set();
-			wrapper.querySelectorAll("p").forEach((p) => {
-				Array.from(p.getClientRects()).forEach((r) => {
-					xs.add(Math.round(r.left));
-				});
-			});
-			return xs.size;
+			// The span interrupts the columns: content appears in two column
+			// segments (before and after the header), each with two columns.
+			const rows = wrapper.querySelectorAll(":scope > .paged_columns");
+			const paragraphsInColumns =
+				wrapper.querySelectorAll(".paged_column p").length;
+			return {
+				rows: rows.length,
+				paragraphsInColumns,
+				colsPerRow: rows[0]
+					? rows[0].querySelectorAll(":scope > .paged_column").length
+					: 0,
+			};
 		});
-		expect(info).toBeGreaterThanOrEqual(2);
+		expect(info.rows).toBeGreaterThanOrEqual(2);
+		expect(info.paragraphsInColumns).toBeGreaterThanOrEqual(2);
+		expect(info.colsPerRow).toEqual(2);
 	});
 });

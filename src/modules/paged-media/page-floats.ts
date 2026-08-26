@@ -7,6 +7,7 @@ import type { CssNode, List } from "css-tree";
 
 interface FloatsPage {
 	element: HTMLElement;
+	createWrapper: () => HTMLDivElement;
 }
 
 interface FloatsChunker {
@@ -344,6 +345,12 @@ class PageFloats extends Handler {
 
 		let page = chunker.addPage();
 
+		// This page never goes through a normal layout pass, so its flow
+		// host (including the float containers, which are built by
+		// createWrapper rather than the template) must be created here for
+		// the deferred floats to land in.
+		page.createWrapper();
+
 		chunker.hooks.beforePageLayout.trigger(
 			page,
 			undefined,
@@ -555,6 +562,10 @@ class PageFloats extends Handler {
 	 * Bottom edge of the rendered flow content within the page,
 	 * excluding the float spacer.
 	 *
+	 * For manual-columns pages the flow lives inside the column boxes; the
+	 * bottom is the deepest visible line across all columns (the column
+	 * boxes themselves are full-height and must not count as content).
+	 *
 	 * @param {Element} content - The .paged_page_content element.
 	 * @returns {number} Pixel coordinate of the flow's bottom edge.
 	 */
@@ -563,6 +574,21 @@ class PageFloats extends Handler {
 		if (!wrapper || !wrapper.firstChild) {
 			return content.getBoundingClientRect().top;
 		}
+
+		const columns = wrapper.querySelectorAll(
+			":scope > .paged_columns > .paged_column",
+		);
+		if (columns.length) {
+			let bottom = content.getBoundingClientRect().top;
+			for (const column of Array.from(columns) as HTMLElement[]) {
+				const columnBottom = this.columnContentBottom(column);
+				if (columnBottom > bottom) {
+					bottom = columnBottom;
+				}
+			}
+			return bottom;
+		}
+
 		let spacer = wrapper.querySelector(":scope > .paged_float_spacer") as HTMLElement | null;
 		let hidden = false;
 		if (spacer && spacer.style.display !== "none") {
@@ -576,6 +602,50 @@ class PageFloats extends Handler {
 			if (hidden) {
 				spacer!.style.display = "";
 			}
+		}
+		return bottom;
+	}
+
+	/**
+	 * Bottom edge of a manual column's *content*, excluding the column
+	 * box itself (which spans the full page height by design).
+	 *
+	 * @param {HTMLElement} column - The .paged_column element.
+	 * @returns {number} Pixel coordinate of the deepest content line.
+	 */
+	private columnContentBottom(column: HTMLElement): number {
+		const range = document.createRange();
+		let bottom = column.getBoundingClientRect().top;
+		const walker = document.createTreeWalker(
+			column,
+			NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+			{
+				acceptNode: (node) =>
+					node === column
+						? NodeFilter.FILTER_SKIP
+						: NodeFilter.FILTER_ACCEPT,
+			},
+		);
+		let current = walker.nextNode();
+		const pushRect = (rect: DOMRect) => {
+			if (rect && (rect.width || rect.height) && rect.bottom > bottom) {
+				bottom = rect.bottom;
+			}
+		};
+		while (current) {
+			if (current.nodeType === Node.ELEMENT_NODE) {
+				const rects = (current as Element).getClientRects();
+				for (let i = 0; i < rects.length; i++) {
+					pushRect(rects[i]);
+				}
+			} else {
+				range.selectNodeContents(current);
+				const rects = range.getClientRects();
+				for (let i = 0; i < rects.length; i++) {
+					pushRect(rects[i]);
+				}
+			}
+			current = walker.nextNode();
 		}
 		return bottom;
 	}
@@ -615,6 +685,23 @@ class PageFloats extends Handler {
 		const walker = document.createTreeWalker(
 			wrapper,
 			NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+			{
+				acceptNode: (node) => {
+					// Float containers and the float spacer are not flow
+					// content; skip their subtrees entirely.
+					if (node !== wrapper && node.nodeType === Node.ELEMENT_NODE) {
+						const cls = (node as Element).className || "";
+						if (
+							cls.includes("paged_float_top") ||
+							cls.includes("paged_float_bottom") ||
+							cls.includes("paged_float_spacer")
+						) {
+							return NodeFilter.FILTER_REJECT;
+						}
+					}
+					return NodeFilter.FILTER_ACCEPT;
+				},
+			},
 		);
 		let current = walker.nextNode();
 		while (current) {
@@ -708,6 +795,9 @@ class PageFloats extends Handler {
 			return;
 		}
 		let reserve = this.reservedHeight(content);
+		// On manual-columns pages the spacer sits above the column row and
+		// pushes every column's content down uniformly.
+		let columns = wrapper.querySelector(":scope > .paged_columns");
 		let spacer = wrapper.querySelector(":scope > .paged_float_spacer") as HTMLElement | null;
 
 		if (reserve <= 0) {
@@ -720,7 +810,11 @@ class PageFloats extends Handler {
 		if (!spacer) {
 			spacer = document.createElement("div");
 			spacer.classList.add("paged_float_spacer");
-			wrapper.appendChild(spacer);
+			if (columns) {
+				wrapper.insertBefore(spacer, columns);
+			} else {
+				wrapper.appendChild(spacer);
+			}
 		}
 		spacer.style.height = reserve + "px";
 	}

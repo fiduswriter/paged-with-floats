@@ -393,6 +393,8 @@ export default `
 	height: inherit;
 }
 
+/* Float containers as direct children of the content area (single-column
+   pages): classic structure. */
 .paged_pagebox > .paged_area > .paged_page_content > .paged_float_top,
 .paged_pagebox > .paged_area > .paged_page_content > .paged_float_bottom {
 	display: flow-root;
@@ -407,6 +409,39 @@ export default `
 	left: 0;
 	right: 0;
 	bottom: 0;
+}
+
+/* The flow host: a block holding the float containers and (for root-level
+   multicol) manual column rows. Columns are content-sized; the layout
+   engine detects overflow against the host's vertical extent, so no CSS
+   column-count is ever needed. */
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow {
+	height: inherit;
+	position: relative;
+}
+
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_top {
+	width: 100%;
+}
+
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_bottom {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_columns {
+	display: flex;
+}
+
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_columns > .paged_column {
+	flex: 0 0 auto;
+	height: auto;
+}
+
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_spacer {
+	height: auto;
 }
 
 .paged_pagebox > .paged_area > .paged_footnote_area {

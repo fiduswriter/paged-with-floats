@@ -29,9 +29,13 @@ describe("multicol-two-columns", () => {
 					xs.add(Math.round(r.left));
 				});
 			});
-			const cs = window.getComputedStyle(wrapper);
+			// Manual columns: no `column-count` is ever applied; the flow
+			// is cut into explicit `.paged_column` boxes.
+			const columnCount = wrapper.querySelectorAll(
+				":scope > .paged_columns > .paged_column",
+			).length;
 			return {
-				columnCount: cs.columnCount,
+				columnCount: String(columnCount),
 				distinctLefts: Array.from(xs).sort((a, b) => a - b),
 				wrapperWidth: wrapper.clientWidth,
 			};

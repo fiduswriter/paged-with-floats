@@ -23,9 +23,10 @@ describe("page-floats-top-basic", () => {
 			let top = pg.querySelector(".paged_float_top");
 			let fig = top.querySelector("#float-a");
 			let content = pg.querySelector(".paged_page_content");
-			let flowChildren = Array.from(content.children).filter(
-				(d) => !d.classList.contains("paged_float_top") &&
-					!d.classList.contains("paged_float_bottom")
+			// The float must not sit inside the flow content (everything in
+			// the host except its float containers).
+			let flowHasFigure = !!content.querySelector(
+				".paged_flow > :not(.paged_float_top):not(.paged_float_bottom) figure"
 			);
 			return {
 				inContainer: !!fig,
@@ -34,7 +35,7 @@ describe("page-floats-top-basic", () => {
 				figTop: fig ? fig.getBoundingClientRect().top : null,
 				figBottom: fig ? fig.getBoundingClientRect().bottom : null,
 				firstPTop: document.getElementById("first").getBoundingClientRect().top,
-				wrapperHasFigure: flowChildren.some((d) => d.querySelector("figure")),
+				wrapperHasFigure: flowHasFigure,
 			};
 		});
 		expect(info.inContainer).toBe(true);

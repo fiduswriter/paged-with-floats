@@ -56,6 +56,8 @@ const COLUMN_PROPERTIES = [
 class Columns extends Handler {
 	/** Selectors seen in author CSS that declare multi-column formatting. */
 	multicolSelectors: Set<string>;
+	/** Selectors declaring `column-span: all` (full-width rows). */
+	columnSpanSelectors: Set<string>;
 	/** Root-level config assembled from body/html column declarations. */
 	rootColumnsFromCss: RootColumnCssConfig;
 	/**
@@ -72,6 +74,7 @@ class Columns extends Handler {
 		super(chunker, polisher, caller);
 
 		this.multicolSelectors = new Set();
+		this.columnSpanSelectors = new Set();
 		this.rootColumnsFromCss = {};
 	}
 
@@ -138,11 +141,20 @@ class Columns extends Handler {
 			// Share with the chunker so the layout stage can find the
 			// rendered fragmentainer roots for each page.
 			const chunker = this.chunker as unknown as
-				| { multicolSelectors?: Set<string> }
+				| { multicolSelectors?: Set<string>; columnSpanSelectors?: Set<string> }
 				| null
 				| undefined;
 			if (chunker && chunker.multicolSelectors) {
 				chunker.multicolSelectors.add(s);
+			}
+
+			// `column-span: all` selectors drive the manual column engine's
+			// full-width rows; track them for the layout stage too.
+			if (property === "column-span") {
+				this.columnSpanSelectors.add(s);
+				if (chunker && chunker.columnSpanSelectors) {
+					chunker.columnSpanSelectors.add(s);
+				}
 			}
 		});
 

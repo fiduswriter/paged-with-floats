@@ -165,6 +165,8 @@ class Chunker {
 	breakToken?: BreakToken;
 	/** Selector strings from author CSS that declare multi-column formatting. */
 	multicolSelectors: Set<string>;
+	/** Selectors declaring `column-span: all` (full-width rows). */
+	columnSpanSelectors: Set<string>;
 	/** Root-level multicol configuration applied to every page wrapper. */
 	rootColumns?: RootColumnConfig;
 	/**
@@ -233,6 +235,7 @@ class Chunker {
 		this.charsPerBreak = [];
 
 		this.multicolSelectors = new Set();
+		this.columnSpanSelectors = new Set();
 
 		if (content) {
 			this.flow(content, renderTo);
@@ -897,6 +900,7 @@ class Chunker {
 			...this.settings,
 			rootColumns: this.rootColumns,
 			multicolSelectors: this.multicolSelectors,
+			columnSpanSelectors: this.columnSpanSelectors,
 		};
 	}
 

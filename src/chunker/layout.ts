@@ -204,19 +204,29 @@ export function validateRenderedPages(
 		if (!wrapper) {
 			return;
 		}
-		if (wrapper.scrollWidth > wrapper.clientWidth + 2) {
-			violations.push({
-				page: pg.id,
-				kind: "h-spill",
-				detail: `scrollWidth ${wrapper.scrollWidth} > clientWidth ${wrapper.clientWidth}`,
-			});
-		}
-		if (wrapper.scrollHeight > wrapper.clientHeight + 2) {
-			violations.push({
-				page: pg.id,
-				kind: "v-spill",
-				detail: `scrollHeight ${wrapper.scrollHeight} > clientHeight ${wrapper.clientHeight}`,
-			});
+
+		const columns = wrapper.querySelectorAll(
+			":scope > .paged_columns > .paged_column",
+		);
+		const containers = columns.length
+			? (Array.from(columns) as HTMLElement[])
+			: [wrapper];
+
+		for (const container of containers) {
+			if (container.scrollWidth > container.clientWidth + 2) {
+				violations.push({
+					page: pg.id,
+					kind: "h-spill",
+					detail: `scrollWidth ${container.scrollWidth} > clientWidth ${container.clientWidth}`,
+				});
+			}
+			if (container.scrollHeight > container.clientHeight + 2) {
+				violations.push({
+					page: pg.id,
+					kind: "v-spill",
+					detail: `scrollHeight ${container.scrollHeight} > clientHeight ${container.clientHeight}`,
+				});
+			}
 		}
 	});
 	return violations;
@@ -392,6 +402,8 @@ class Layout {
 	failed?: boolean;
 	/** Selector strings that may produce fragmentainers (from author CSS). */
 	multicolSelectors: Set<string>;
+	/** Selectors declaring `column-span: all` (full-width rows). */
+	columnSpanSelectors: Set<string>;
 	/** Root-level multicol config applied to the page wrapper (if any). */
 	rootColumns?: {
 		count: number;
@@ -500,6 +512,8 @@ class Layout {
 
 		this.multicolSelectors =
 			(this.settings.multicolSelectors as Set<string>) || new Set();
+		this.columnSpanSelectors =
+			(this.settings.columnSpanSelectors as Set<string>) || new Set();
 		this.rootColumns = this.settings.rootColumns as Layout["rootColumns"];
 		this.fragmentainers = new Set();
 		this.fragmentainerMeta = new WeakMap();
@@ -516,6 +530,201 @@ class Layout {
 	}
 
 	/**
+	 * The manual column boxes of a flow host, or the host itself when the
+	 * page is single-column. Content is filled into these sequentially.
+	 *
+	 * With `column-span` segments the host holds several `.paged_columns`
+	 * rows; the active row is the last one (newest segment).
+	 *
+	 * @param {HTMLElement} wrapper - The page's flow host (`.paged_flow`).
+	 * @returns {HTMLElement[]} The containers to fill, in order.
+	 */
+	flowColumns(wrapper: HTMLElement): HTMLElement[] {
+		const rows = wrapper.querySelectorAll(":scope > .paged_columns");
+		const row = rows.length ? rows[rows.length - 1] : null;
+		if (row) {
+			const columns = row.querySelectorAll(":scope > .paged_column");
+			return Array.from(columns) as HTMLElement[];
+		}
+		return [wrapper];
+	}
+
+	/**
+	 * Starts a new column segment below a `column-span: all` element.
+	 *
+	 * The spanning element has already been appended to the flow host; this
+	 * adds a fresh row of column boxes for the content that follows, which
+	 * continues as a new set of columns (column 0 again), mirroring CSS
+	 * multicol's span semantics.
+	 *
+	 * @param {HTMLElement} wrapper - The flow host.
+	 * @returns {HTMLElement[]} The new segment's column boxes.
+	 */
+	private startSpanRow(wrapper: HTMLElement): HTMLElement[] {
+		const rootColumns = this.settings.rootColumns as
+			| { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string }
+			| undefined;
+		const count =
+			rootColumns && rootColumns.count > 1
+				? Math.floor(rootColumns.count)
+				: 1;
+		if (count <= 1) {
+			return [wrapper];
+		}
+		const config = rootColumns as { gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string };
+		const gap =
+			config.gap !== undefined && config.gap !== "normal"
+				? config.gap
+				: "1em";
+		const row = document.createElement("div");
+		row.classList.add("paged_columns");
+		row.style.gap = gap;
+		for (let i = 0; i < count; i++) {
+			const column = document.createElement("div");
+			column.classList.add("paged_column");
+			column.dataset.pagedColumn = String(i);
+			column.style.width = `calc((100% - ${count - 1} * ${gap}) / ${count})`;
+			if (i > 0 && config.ruleWidth) {
+				column.style.borderLeft =
+					`${config.ruleWidth} ${config.ruleStyle || "solid"}` +
+					(config.ruleColor ? ` ${config.ruleColor}` : "");
+			}
+			row.appendChild(column);
+		}
+		wrapper.appendChild(row);
+		return Array.from(
+			row.querySelectorAll(":scope > .paged_column"),
+		) as HTMLElement[];
+	}
+
+	/**
+	 * Whether a source node carries `column-span: all` and therefore breaks
+	 * the current column segment into a full-width row.
+	 *
+	 * @param {Node|null} node - The source node.
+	 * @returns {boolean} True when the node spans all columns.
+	 */
+	private isColumnSpan(node: Node | null | undefined): boolean {
+		if (!node || !(node instanceof HTMLElement)) {
+			return false;
+		}
+		// Author CSS `column-span: all` (tracked by the Columns handler)
+		// decides; computed style on detached source nodes is unreliable.
+		for (const selector of this.columnSpanSelectors) {
+			try {
+				if (node.matches(selector)) {
+					return true;
+				}
+			} catch {
+				// ignore invalid selectors
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Adds a `column-span: all` element as a full-width row and opens a new
+	 * column segment below it.
+	 *
+	 * @param {HTMLElement} wrapper - The flow host.
+	 * @param {Node} node - The spanning source node.
+	 * @param {Node|DocumentFragment} source - The source content.
+	 * @param {BreakToken|undefined} breakToken - Current break token.
+	 * @returns {HTMLElement[]} The new segment's column boxes.
+	 */
+	private applyColumnSpan(
+		wrapper: HTMLElement,
+		node: Node,
+		source: DocumentFragment | Node,
+		breakToken: BreakToken | undefined,
+	): HTMLElement[] {
+		this.append(node, wrapper, source, breakToken, false);
+		return this.startSpanRow(wrapper);
+	}
+
+	/**
+	 * Makes a column box the active layout root: bounds, fragmentainer
+	 * ancestor walks and overflow detection follow this element until the
+	 * next column (or page) takes over.
+	 *
+	 * @param {HTMLElement} dest - The column (or single-column wrapper).
+	 * @returns {void}
+	 */
+	setActiveColumn(dest: HTMLElement): void {
+		// Single-column pages keep the content area as the layout root
+		// (classic bounds); only manual column boxes swap the root.
+		if (dest.classList.contains("paged_column")) {
+			this.element = dest;
+		}
+		this.boundsDirty = true;
+		// Compute bounds immediately (the overflow phase relies on
+		// refreshBounds, but callers may read this.bounds directly).
+		const elRect = dest.getBoundingClientRect();
+		if (dest.classList.contains("paged_column") && dest.closest(".paged_flow")) {
+			const hostRect = dest.closest(".paged_flow")!.getBoundingClientRect();
+			this.bounds = new DOMRect(
+				elRect.left,
+				hostRect.top,
+				elRect.width,
+				hostRect.height,
+			);
+		} else {
+			this.bounds = this.refreshBounds();
+		}
+	}
+
+	/**
+	 * Clears overflow bookkeeping attributes from a column and its content.
+	 *
+	 * Range tagging (which marks content already accounted for as overflow)
+	 * can cross a column boundary — `nodeAfter` climbs past a column's last
+	 * child and tags the next column as range-end overflow — suppressing all
+	 * further detection there. Every column starts its fill with a clean
+	 * slate, so these attributes are stripped when content is handed over.
+	 *
+	 * @param {HTMLElement} dest - The column (or single-column wrapper).
+	 * @returns {void}
+	 */
+	private clearOverflowTags(dest: HTMLElement): void {
+		dest.removeAttribute("data-overflow-tagged");
+		dest.removeAttribute("data-range-start-overflow");
+		dest.removeAttribute("data-range-end-overflow");
+		dest
+			.querySelectorAll(
+				"[data-overflow-tagged], [data-range-start-overflow], [data-range-end-overflow]",
+			)
+			.forEach((el) => {
+				el.removeAttribute("data-overflow-tagged");
+				el.removeAttribute("data-range-start-overflow");
+				el.removeAttribute("data-range-end-overflow");
+			});
+	}
+
+	/**
+	 * Advances layout to the next column, rebuilding the current overflow
+	 * into it and clearing stray overflow tags left by range tagging.
+	 *
+	 * @param {HTMLElement[]} columns - The page's column boxes.
+	 * @param {number} colIndex - Current column index.
+	 * @param {BreakToken} token - Overflow token to rebuild.
+	 * @param {HTMLElement|null} prevPage - Previous page content.
+	 * @returns {HTMLElement} The new active column.
+	 */
+	private advanceColumn(
+		columns: HTMLElement[],
+		colIndex: number,
+		token: BreakToken,
+		prevPage: HTMLElement | null,
+	): HTMLElement {
+		const next = columns[colIndex + 1];
+		this.setActiveColumn(next);
+		this.addOverflowToPage(next, token, prevPage || undefined);
+		this.clearOverflowTags(next);
+		this.registerFragmentainers(next);
+		return next;
+	}
+
+	/**
 	 * Page content bounds, re-measured at most once per mutation batch.
 	 *
 	 * Appending a node only matters geometrically when something later
@@ -524,7 +733,26 @@ class Layout {
 	 */
 	refreshBounds(): DOMRect {
 		if (this.boundsDirty) {
-			this.bounds = this.element.getBoundingClientRect();
+			const elRect = this.element.getBoundingClientRect();
+			if (
+				this.element.classList.contains("paged_column") &&
+				this.element.closest(".paged_flow")
+			) {
+				// Manual columns are content-sized; overflow is detected
+				// against the flow host's vertical extent (the visible page
+				// region), while the horizontal extent is the column's own.
+				const hostRect = this.element
+					.closest(".paged_flow")!
+					.getBoundingClientRect();
+				this.bounds = new DOMRect(
+					elRect.left,
+					hostRect.top,
+					elRect.width,
+					hostRect.height,
+				);
+			} else {
+				this.bounds = elRect;
+			}
 			this.boundsDirty = false;
 		}
 		return this.bounds;
@@ -793,12 +1021,22 @@ class Layout {
 
 		let prevBreakToken = breakToken || new BreakToken(start!);
 
+		// Manual columns: the flow host holds N column boxes that are
+		// filled sequentially as single-column fragmentainers. `dest` is
+		// the column currently receiving content (the host itself for
+		// single-column pages). `columns` may be swapped for a fresh
+		// segment when a `column-span: all` element is encountered.
+		let columns = this.flowColumns(wrapper);
+		let colIndex = 0;
+		let dest = columns[0];
+		this.setActiveColumn(dest);
+
 		this.hooks &&
 			this.hooks.onPageLayout.trigger(wrapper, prevBreakToken, this);
 
 		// Add overflow, and check that it doesn't have overflow itself.
 		this.addOverflowToPage(
-			wrapper,
+			dest,
 			breakToken,
 			prevPage as HTMLElement | undefined,
 		);
@@ -806,15 +1044,16 @@ class Layout {
 		// Footnotes may change the bounds.
 		bounds = this.refreshBounds();
 
-		// Register fragmentainers (root-level multicol wrapper and any
-		// multicol blocks carried over from the previous page).
-		this.registerFragmentainers(wrapper);
+		// Register fragmentainers (mid-flow multicol blocks inside the
+		// column; the manual column boxes themselves are plain single
+		// column fragmentainers and need no registration).
+		this.registerFragmentainers(dest);
 		for (const frag of Array.from(this.fragmentainers)) {
 			this.constrainMulticolHeight(frag, bounds);
 		}
 
 		let newBreakToken = this.findBreakToken(
-			wrapper,
+			dest,
 			source,
 			bounds,
 			prevBreakToken,
@@ -828,7 +1067,35 @@ class Layout {
 			return new RenderResult(newBreakToken);
 		}
 
-		let hasRenderedContent = !!wrapper.childNodes.length;
+		// Overflow rebuilt from the previous page can be taller than the
+		// first column; hand it to the next column on this page before
+		// walking further content.
+		if (
+			newBreakToken &&
+			!newBreakToken.isFinished() &&
+			colIndex < columns.length - 1
+		) {
+			dest = this.advanceColumn(
+				columns,
+				colIndex,
+				newBreakToken,
+				prevPage as HTMLElement | null,
+			);
+			colIndex++;
+			bounds = this.refreshBounds();
+			newBreakToken = undefined;
+		}
+
+		let hasRenderedContent = Array.from(wrapper.childNodes).some((child) => {
+			if (!(child instanceof HTMLElement)) {
+				return true;
+			}
+			return (
+				!child.classList.contains("paged_float_top") &&
+				!child.classList.contains("paged_float_bottom") &&
+				!child.classList.contains("paged_float_spacer")
+			);
+		});
 
 		if (prevBreakToken) {
 			forcedBreakQueue = prevBreakToken.getForcedBreakQueue();
@@ -866,6 +1133,27 @@ class Layout {
 				}
 			}
 
+			// A `column-span: all` element takes a full-width row between
+			// column segments; the flow after it continues in a fresh set of
+			// columns (column 0 again). If the current columns already
+			// overflow, that overflow must be handled first (the span then
+			// interrupts at its natural flow position, possibly on the next
+			// page).
+			if (
+				this.isColumnSpan(node) &&
+				columns.length > 1 &&
+				!this.hasOverflow(dest, this.refreshBounds())
+			) {
+				columns = this.applyColumnSpan(wrapper, node!, source, breakToken);
+				colIndex = 0;
+				dest = columns[0];
+				this.setActiveColumn(dest);
+				bounds = this.refreshBounds();
+				hasRenderedContent = true;
+				walker = walk(nodeAfter(node!, source) as Node, source);
+				continue;
+			}
+
 			// Check whether we have overflow when we've completed laying out a top
 			// level element. This lets it have multiple children overflowing and
 			// allows us to move all of the overflows onto the next page together.
@@ -881,7 +1169,7 @@ class Layout {
 				bounds = this.refreshBounds();
 
 				newBreakToken = this.findBreakToken(
-					wrapper,
+					dest,
 					source,
 					bounds,
 					prevBreakToken,
@@ -917,6 +1205,25 @@ class Layout {
 					);
 				}
 
+				// The current column is full: hand the overflow to the next
+				// column on this page instead of breaking to a new page.
+				if (
+					newBreakToken &&
+					!newBreakToken.isFinished() &&
+					colIndex < columns.length - 1
+				) {
+					dest = this.advanceColumn(
+						columns,
+						colIndex,
+						newBreakToken,
+						prevPage as HTMLElement | null,
+					);
+					colIndex++;
+					bounds = this.refreshBounds();
+					newBreakToken = undefined;
+					continue;
+				}
+
 				if (!node || newBreakToken) {
 					return new RenderResult(newBreakToken);
 				}
@@ -927,7 +1234,7 @@ class Layout {
 
 			const appendedClone = this.append(
 				node!,
-				wrapper,
+				dest,
 				source,
 				breakToken,
 				shallow,
@@ -972,6 +1279,46 @@ class Layout {
 			// Skip to the next node if a deep clone was rendered.
 			if (!shallow) {
 				walker = walk(nodeAfter(node!, source) as Node, source);
+			}
+		}
+
+		// The walker may have exhausted right after handing content to a
+		// new column, in which case the loop exits before that column's
+		// overflow is checked. Run one final check, cascading into any
+		// further columns.
+		if (done && !newBreakToken) {
+			let cascades = 0;
+			for (;;) {
+				bounds = this.refreshBounds();
+				newBreakToken = this.findBreakToken(
+					dest,
+					source,
+					bounds,
+					prevBreakToken,
+					undefined,
+				);
+				if (newBreakToken && node === undefined) {
+					newBreakToken.setFinished();
+				}
+				if (
+					newBreakToken &&
+					!newBreakToken.isFinished() &&
+					colIndex < columns.length - 1
+				) {
+					dest = this.advanceColumn(
+						columns,
+						colIndex,
+						newBreakToken,
+						prevPage as HTMLElement | null,
+					);
+					colIndex++;
+					newBreakToken = undefined;
+					if (++cascades >= columns.length) {
+						break;
+					}
+					continue;
+				}
+				break;
 			}
 		}
 
@@ -1094,6 +1441,10 @@ class Layout {
 		breakToken: BreakToken | undefined,
 		alreadyRendered?: DocumentFragment | Node,
 	): void {
+		if (!dest) {
+			console.warn("paged-with-floats: addOverflowToPage called with null dest", new Error().stack);
+			return;
+		}
 		if (!breakToken || !breakToken.overflow.length) {
 			return;
 		}
@@ -1758,7 +2109,10 @@ class Layout {
 		let constrainingElement = element && (element.parentNode as Element); // this gets the element, instead of the wrapper for the width workaround
 		if (
 			constrainingElement &&
-			constrainingElement.classList.contains("paged_page_content")
+			(constrainingElement.classList.contains("paged_page_content") ||
+				// A manual column's content overflow does not grow the flex
+				// row it sits in; measure the column box itself.
+				constrainingElement.classList.contains("paged_columns"))
 		) {
 			constrainingElement = element;
 		}

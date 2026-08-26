@@ -2233,10 +2233,17 @@ class AtPage extends Handler {
 	) {
 		let thisPage = chunker.pages[chunker.pages.length - 1];
 		// If only footnotes were added, attribs should be like the previous page.
+		// The flow host always contains (empty) float containers; measure the
+		// actual flow content instead.
 		let emptyBody =
 			!thisPage.wrapper ||
-			!thisPage.wrapper.childElementCount ||
-			!thisPage.wrapper.firstElementChild!.getBoundingClientRect().height;
+			!Array.from(thisPage.wrapper.children).some(
+				(child) =>
+					child instanceof HTMLElement &&
+					!child.classList.contains("paged_float_top") &&
+					!child.classList.contains("paged_float_bottom") &&
+					child.getBoundingClientRect().height,
+			);
 		let emptyFootnotes =
 			!thisPage.footnotesArea.firstElementChild!.childElementCount ||
 			!thisPage.footnotesArea.firstElementChild!.firstElementChild!.getBoundingClientRect()
