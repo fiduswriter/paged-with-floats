@@ -205,6 +205,53 @@ class Previewer {
 	}
 
 	/**
+	 * Harvests stylesheets embedded in the content itself — `<style>`
+	 * elements and stylesheet `<link>`s that live inside the body/fragment
+	 * rather than the document head.
+	 *
+	 * Manual `Previewer` callers typically pass a fragment whose CSS is
+	 * embedded in it (demos, editable previews). Without harvesting, that
+	 * CSS never reaches the polisher: handlers never see the declarations
+	 * (page floats go untagged, `@page` rules stay dead) and the raw rules
+	 * apply globally once rendered. The elements are removed from the
+	 * content and returned for polisher processing.
+	 *
+	 * @param {DocumentFragment|HTMLElement} content - The content to harvest from.
+	 * @returns {Array} - Stylesheet hrefs / inline style objects, in document order.
+	 */
+	removeContentStyles(
+		content?: DocumentFragment | HTMLElement | string | null,
+	): Array<string | Record<string, string> | undefined> {
+		const root = content as ParentNode;
+		if (!root || typeof root.querySelectorAll !== "function") {
+			return [];
+		}
+		const elements = Array.from(
+			root.querySelectorAll(
+				"style:not([data-paged-inserted-styles], [data-paged-ignore], [media~='screen']), " +
+					"link[rel='stylesheet']:not([data-paged-ignore], [media~='screen'])",
+			),
+		);
+		return elements
+			.sort((a, b) => {
+				const position = a.compareDocumentPosition(b);
+				if (position === Node.DOCUMENT_POSITION_PRECEDING) return 1;
+				if (position === Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+				return 0;
+			})
+			.map((element) => {
+				if (element.nodeName === "STYLE") {
+					const obj: Record<string, string> = {};
+					obj[window.location.href] = element.textContent!;
+					element.remove();
+					return obj;
+				}
+				element.remove();
+				return (element as HTMLLinkElement).href;
+			});
+	}
+
+	/**
 	 * Main method for rendering content into paginated preview.
 	 * Triggers hooks and events, applies stylesheets, chunks the content, and returns the flow result.
 	 *
@@ -227,9 +274,17 @@ class Previewer {
 			flowContent = this.wrapContent();
 		}
 
-		if (!flowStylesheets) {
-			flowStylesheets = this.removeStyles();
+		let docStylesheets: Array<string | Record<string, string> | undefined> =
+			[];
+		if (flowStylesheets === undefined || flowStylesheets === null) {
+			docStylesheets = this.removeStyles();
 		}
+
+		// Content-embedded styles are harvested wherever the content came
+		// from and processed last (they originate latest in source order).
+		const contentStylesheets = this.removeContentStyles(flowContent);
+
+		flowStylesheets = [...docStylesheets, ...(flowStylesheets ?? []), ...contentStylesheets];
 
 		this.polisher.setup();
 		this.handlers = this.initializeHandlers();

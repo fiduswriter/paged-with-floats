@@ -206,6 +206,44 @@ class Page {
 	*/
 
 	/**
+	 * Marks or unmarks this page as the one currently being laid out.
+	 *
+	 * While active, `content-visibility: visible` is forced so every
+	 * geometry read during pagination sees real boxes — even when consumer
+	 * CSS keeps off-screen pages skipped (e.g. demos injecting
+	 * `content-visibility: auto`, which would otherwise make word rects,
+	 * scrollWidth and friends read as placeholders for pages near the
+	 * viewport threshold). The inline override is removed afterwards so
+	 * author/demo rules apply again to the finished page.
+	 *
+	 * @param {boolean} active - Whether layout on this page is running.
+	 */
+	setLayoutActive(active: boolean): void {
+		const el = this.element;
+		if (!el) {
+			return;
+		}
+		if (active) {
+			el.setAttribute("data-paged-active", "true");
+			el.style.setProperty("content-visibility", "visible");
+			this.invalidateActiveSize();
+		} else {
+			el.removeAttribute("data-paged-active");
+			el.style.removeProperty("content-visibility");
+		}
+	}
+
+	/**
+	 * Drops cached sizing state that depended on skipped layout while the
+	 * page was inactive (placeholder intrinsic size), forcing fresh
+	 * measurement once contents are forced visible again.
+	 */
+	private invalidateActiveSize(): void {
+		this.width = undefined;
+		this.height = undefined;
+	}
+
+	/**
 	 * Start to layout page
 	 *
 	 * @param {HTML} contents - HTML content
@@ -220,6 +258,8 @@ class Page {
 	): Promise<BreakToken | undefined> {
 		this.clear();
 
+		this.setLayoutActive(true);
+
 		this.startToken = breakToken;
 
 		this.layoutMethod = new Layout(this.area!, this.hooks, this.settings);
@@ -231,6 +271,8 @@ class Page {
 			prevPage as unknown as HTMLElement,
 		);
 		let newBreakToken = renderResult.breakToken as BreakToken | undefined;
+
+		this.setLayoutActive(false);
 
 		if (breakToken && newBreakToken && breakToken.equals(newBreakToken)) {
 			// Zero progress this page: pagination would loop forever, so it
@@ -275,12 +317,16 @@ class Page {
 			return this.layout(contents, breakToken);
 		}
 
+		this.setLayoutActive(true);
+
 		let renderResult: RenderResult = await this.layoutMethod.renderTo(
 			this.wrapper!,
 			contents,
 			breakToken,
 		);
 		let newBreakToken = renderResult.breakToken as BreakToken | undefined;
+
+		this.setLayoutActive(false);
 
 		this.endToken = newBreakToken;
 
@@ -462,6 +508,7 @@ class Page {
 	 */
 	destroy(): void {
 		this.removeListeners();
+		this.setLayoutActive(false);
 
 		this.element!.remove();
 

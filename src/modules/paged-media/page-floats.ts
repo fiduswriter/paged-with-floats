@@ -54,6 +54,9 @@ const FLOAT_SIDES = {
  */
 const MAX_DEFERRALS = 2;
 
+/** Tolerance in px when classifying a rect as inside the spill column. */
+const COLUMN_SPILL_EPSILON = 1;
+
 /**
  * Handles CSS page floats (`float-reference: page` combined with
  * `float: top | bottom | block-start | block-end`).
@@ -566,13 +569,100 @@ class PageFloats extends Handler {
 			spacer.style.display = "none";
 			hidden = true;
 		}
-		let range = document.createRange();
-		range.selectNodeContents(wrapper);
-		let bottom = range.getBoundingClientRect().bottom;
-		if (hidden) {
-			spacer!.style.display = "";
+		let bottom: number;
+		try {
+			bottom = this.visibleFlowBottom(wrapper as HTMLElement);
+		} finally {
+			if (hidden) {
+				spacer!.style.display = "";
+			}
 		}
 		return bottom;
+	}
+
+	/**
+	 * Bottom edge of flow content sitting in a *visible* column of the
+	 * wrapper.
+	 *
+	 * A single union bounding rect over the whole wrapper is wrong under
+	 * multi-column layout: fragments continue into a hidden spill column to
+	 * the right of the last visible one, and that column's line bottoms
+	 * masquerade as flow content reaching the page bottom — which made top
+	 * floats defer (or force-place late) even when visible columns had room.
+	 * Client rects are therefore filtered to those starting left of the
+	 * spill-column edge before taking the maximum bottom.
+	 *
+	 * @param {HTMLElement} wrapper - The page's flow content wrapper.
+	 * @returns {number} Pixel coordinate of the visible flow's bottom edge.
+	 */
+	private visibleFlowBottom(wrapper: HTMLElement): number {
+		const geometry = this.spillColumnLeft(wrapper);
+		const range = document.createRange();
+		let bottom = wrapper.getBoundingClientRect().top;
+
+		const pushRect = (rect: DOMRect) => {
+			if (!rect || (!rect.width && !rect.height)) {
+				return;
+			}
+			if (geometry !== null && rect.left >= geometry - COLUMN_SPILL_EPSILON) {
+				return;
+			}
+			if (rect.bottom > bottom) {
+				bottom = rect.bottom;
+			}
+		};
+
+		const walker = document.createTreeWalker(
+			wrapper,
+			NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+		);
+		let current = walker.nextNode();
+		while (current) {
+			if (current.nodeType === Node.ELEMENT_NODE) {
+				const rects = (current as Element).getClientRects();
+				for (let i = 0; i < rects.length; i++) {
+					pushRect(rects[i]);
+				}
+			} else {
+				range.selectNodeContents(current);
+				const rects = range.getClientRects();
+				for (let i = 0; i < rects.length; i++) {
+					pushRect(rects[i]);
+				}
+			}
+			current = walker.nextNode();
+		}
+
+		return bottom;
+	}
+
+	/**
+	 * The left edge of the wrapper's hidden spill column, or null when the
+	 * wrapper is not a multi-column fragmentainer.
+	 *
+	 * Mirrors the chunker's fragmentainer math (`column-gap: normal`
+	 * approximated via font size; fragmented boxes anchored at their first
+	 * client rect).
+	 *
+	 * @param {HTMLElement} wrapper - The flow content wrapper.
+	 * @returns {number|null} Spill column left edge in pixels, or null.
+	 */
+	private spillColumnLeft(wrapper: HTMLElement): number | null {
+		const styles = window.getComputedStyle(wrapper);
+		const count = parseInt(styles.columnCount) || 1;
+		if (count <= 1) {
+			return null;
+		}
+		let gap = parseFloat(styles.columnGap);
+		if (Number.isNaN(gap)) {
+			gap = parseFloat(styles.fontSize) || 0;
+		}
+		const width =
+			wrapper.clientWidth || wrapper.getBoundingClientRect().width;
+		const columnWidth = (width - (count - 1) * gap) / count;
+		const rects = wrapper.getClientRects();
+		const boxLeft = rects.length ? rects[0].left : wrapper.getBoundingClientRect().left;
+		return boxLeft + count * (columnWidth + gap);
 	}
 
 	/**
@@ -638,12 +728,6 @@ class PageFloats extends Handler {
 	/**
 	 * Border box height plus vertical margins of an element.
 	 *
-	 * @param {Element} element - The element to measure.
-	 * @returns {number} Outer height in pixels.
-	 */
-	/**
-	 * Border box height plus vertical margins of an element.
-	 *
 	 * Uses computed styles rather than bounding rects: floats live in a
 	 * multicol context, and a fragmented element's client rects span the
 	 * whole column area, which would grossly overstate its size.
@@ -658,8 +742,17 @@ class PageFloats extends Handler {
 			return 0;
 		}
 
+		let height = parseFloat(styles.height) || 0;
+
+		if (height <= 0 && element.querySelector("img")) {
+			console.warn(
+				"paged-with-floats: page float measured with zero height while containing images; " +
+					"the images may not have finished loading before measurement",
+			);
+		}
+
 		return (
-			(parseFloat(styles.height) || 0) +
+			height +
 			(parseFloat(styles.marginTop) || 0) +
 			(parseFloat(styles.marginBottom) || 0) +
 			(parseFloat(styles.paddingTop) || 0) +

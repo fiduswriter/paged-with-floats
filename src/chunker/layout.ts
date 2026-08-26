@@ -1154,6 +1154,24 @@ class Layout {
 
 		dest.appendChild(fragment!);
 
+		// Floats can be carried across the break by the overflow path: their
+		// source copies are rebuilt here without ever passing through
+		// Layout.append, so the renderNode hook (which extracts page floats
+		// into the page's float containers) never fires for them. Extract
+		// them now, before the fresh page's bounds are measured. Placement
+		// marks nodes placed, so re-firing on nested matches is idempotent.
+		if (this.hooks && this.hooks.renderNode) {
+			Array.from(fragment!.querySelectorAll("[data-page-float]")).forEach(
+				(node) => {
+					let el = node as HTMLElement;
+					if (!el.dataset || el.dataset.pageFloatPlaced) {
+						return;
+					}
+					this.hooks.renderNode!.triggerSync(el, el, this);
+				},
+			);
+		}
+
 		this.hooks && this.hooks.afterOverflowAdded.trigger(dest);
 		this.invalidateBounds();
 	}
@@ -1629,8 +1647,100 @@ class Layout {
 				node,
 				extract,
 			);
+
+			if (breakToken && extract) {
+				this.extractResidualOverflow(
+					rendered,
+					bounds,
+					source,
+					breakToken,
+					prevBreakToken,
+				);
+			}
 		}
 		return breakToken;
+	}
+
+	/**
+	 * Re-sweeps the page for overflow created by the extraction itself.
+	 *
+	 * Removing the overflowing tail of a paragraph changes how the kept
+	 * remainder wraps: hyphenation and justification of the partial
+	 * paragraph differ from the measured whole, so its tail can slip into
+	 * the spill column *after* the primary range collection finished. The
+	 * `data-overflow-tagged` marker — which deliberately suppresses
+	 * re-detection while a pass collects ranges — would hide that fresh
+	 * overflow, leaving text visibly stranded in the hidden column (a
+	 * "third column" the engine already decided to overflow). The marker is
+	 * cleared before each sweep pass and any residue is folded into the
+	 * existing break token, so the next page rebuilds it in document order.
+	 *
+	 * @param {HTMLElement} rendered - The page content wrapper.
+	 * @param {DOMRect} bounds - The page bounds.
+	 * @param {DocumentFragment|Node} source - The source content.
+	 * @param {BreakToken} breakToken - The token the residue appends to.
+	 * @param {BreakToken|undefined} prevBreakToken - The page's incoming
+	 * token, used as the loop guard by processOverflowResult.
+	 * @returns {void}
+	 */
+	private extractResidualOverflow(
+		rendered: HTMLElement,
+		bounds: DOMRect,
+		source: DocumentFragment | Node,
+		breakToken: BreakToken,
+		prevBreakToken: BreakToken | undefined,
+	): void {
+		let guard = 0;
+		// Extraction may have removed the container itself (e.g. an emptied
+		// paragraph that is then dropped); nothing left to sweep.
+		if (!rendered.isConnected) {
+			return;
+		}
+		while (this.hasOverflow(rendered, bounds)) {
+			if (++guard > 10) {
+				console.warn(
+					"paged-with-floats: stopped re-extracting residual overflow on a page (guard limit)",
+				);
+				break;
+			}
+
+			// Make freshly re-wrapped content visible to detection again.
+			rendered
+				.querySelectorAll("[data-overflow-tagged]")
+				.forEach((el) => el.removeAttribute("data-overflow-tagged"));
+			rendered.removeAttribute("data-overflow-tagged");
+
+			try {
+				const range = this.findOverflow(rendered, bounds, source);
+				if (!range) {
+					break;
+				}
+
+				const before = breakToken.overflow.length;
+				this.processOverflowResult(
+					[range],
+					rendered,
+					source,
+					bounds,
+					prevBreakToken,
+					breakToken.node as unknown as Node,
+					true,
+				);
+				if (breakToken.overflow.length === before) {
+					// No progress (loop guard inside processOverflowResult
+					// bailed); stop rather than spin.
+					break;
+				}
+			} catch (error) {
+				// A degenerate page state must never abort pagination over a
+				// best-effort residual sweep; log and move on.
+				console.warn(
+					"paged-with-floats: residual overflow sweep failed: " +
+						(error instanceof Error ? error.message : String(error)),
+				);
+				break;
+			}
+		}
 	}
 
 	/**
@@ -1646,7 +1756,10 @@ class Layout {
 	 */
 	hasOverflow(element: HTMLElement, bounds: DOMRect = this.bounds): boolean {
 		let constrainingElement = element && (element.parentNode as Element); // this gets the element, instead of the wrapper for the width workaround
-		if (constrainingElement.classList.contains("paged_page_content")) {
+		if (
+			constrainingElement &&
+			constrainingElement.classList.contains("paged_page_content")
+		) {
 			constrainingElement = element;
 		}
 		let { width, height } = element.getBoundingClientRect();
@@ -2545,10 +2658,13 @@ class Layout {
 			// Get the columns widths and make them attributes so removal of
 			// overflow doesn't do strange things - they may be affecting
 			// widths on this page.
-			Array.from(check!.parentElement!.children).forEach((childNode) => {
-				let style = getComputedStyle(childNode);
-				(childNode as any).width = style.width;
-			});
+			const checkParent = check!.parentElement;
+			if (checkParent) {
+				Array.from(checkParent.children).forEach((childNode) => {
+					let style = getComputedStyle(childNode);
+					(childNode as any).width = style.width;
+				});
+			}
 
 			if (
 				isElement(check) &&
@@ -2559,7 +2675,7 @@ class Layout {
 				break;
 			}
 			check = check!.parentElement;
-		} while (check && check !== rendered);
+		} while (check && check !== rendered && check.parentElement);
 
 		return this.tagAndCreateOverflowRange(
 			startOfOverflow!,

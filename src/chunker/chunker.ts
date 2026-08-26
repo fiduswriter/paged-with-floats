@@ -16,6 +16,16 @@ import { requestIdleCallback } from "../utils/utils.js";
 import type { PagedEventEmitter } from "../types/emitter.js";
 
 const MAX_PAGES: number | null = null;
+
+/** Upper bound for waiting on a single image during the preload pass. */
+const IMAGE_PRELOAD_TIMEOUT_MS = 10000;
+
+/**
+ * Number of load/barrier passes over the font set. Late-processed styles can
+ * register faces while earlier passes are still awaiting them; two extra
+ * passes cover that without risking an endless loop on pathological sheets.
+ */
+const FONT_LOAD_PASSES = 3;
 const MAX_LAYOUTS: number | false = false;
 
 export interface ChunkerHooks {
@@ -157,6 +167,13 @@ class Chunker {
 	multicolSelectors: Set<string>;
 	/** Root-level multicol configuration applied to every page wrapper. */
 	rootColumns?: RootColumnConfig;
+	/**
+	 * Root-level column configuration captured from author CSS by the
+	 * Columns handler, which simultaneously strips the declarations from
+	 * the sheet so they can never restyle the host document (the rendered
+	 * page list must not become a browser multicol container).
+	 */
+	rootColumnsFromCss?: RootColumnConfig;
 
 	/**
 	 * Create a new Chunker instance.
@@ -227,11 +244,13 @@ class Chunker {
 	 *
 	 * Sources, in order of precedence:
 	 * 1. `settings.rootColumns` ({ count: 2, ... }).
-	 * 2. The computed style of the content element when it is an
+	 * 2. Column declarations on `body`/`html` captured from author CSS by
+	 *    the Columns handler (which strips them from the sheet so the host
+	 *    document is never itself turned into a multicol container).
+	 * 3. The computed style of the content element when it is an
 	 *    HTMLElement attached to the document.
-	 * 3. The computed style of document.body (polyfill flow: author CSS
-	 *    declares columns on body; the body itself is emptied but keeps its
-	 *    declarations).
+	 * 4. The computed style of document.body (legacy fallback for CSS the
+	 *    polisher did not process).
 	 */
 	detectRootColumns(
 		content?: HTMLElement | DocumentFragment | string,
@@ -250,6 +269,18 @@ class Chunker {
 		}
 
 		let el: Element | null = null;
+
+		const fromCss = this.rootColumnsFromCss;
+		if (fromCss && Number(fromCss.count) > 1) {
+			return {
+				count: Math.floor(Number(fromCss.count)),
+				gap: fromCss.gap,
+				ruleColor: fromCss.ruleColor,
+				ruleStyle: fromCss.ruleStyle,
+				ruleWidth: fromCss.ruleWidth,
+			};
+		}
+
 		if (content instanceof HTMLElement && content.isConnected) {
 			el = content;
 		} else if (typeof document !== "undefined") {
@@ -430,6 +461,8 @@ class Chunker {
 		await this.hooks.afterParsed.trigger(parsed as DocumentFragment, this);
 
 		await this.loadFonts();
+
+		await this.loadImages(parsed);
 
 		// The whole document is known at this point: prepare all of its
 		// texts once, after fonts have loaded and with the fragment
@@ -1021,28 +1054,111 @@ class Chunker {
 	/**
 	 * Waits for all fonts to load before rendering starts.
 	 *
+	 * Every registered face is loaded explicitly, then `document.fonts.ready`
+	 * is awaited as a browser-wide barrier. Because styles processed during
+	 * loading can register further faces, the load/barrier cycle repeats
+	 * until a pass finds nothing left unloaded (bounded by FONT_LOAD_PASSES).
+	 * This keeps on-screen text breaking aligned with the fonts the PDF
+	 * emitter later measures against.
+	 *
 	 * @returns {Promise<string[]>} - A promise resolving to a list of font families loaded.
 	 */
-	loadFonts(): Promise<string[]> {
-		let fontPromises: Promise<string>[] = [];
+	async loadFonts(): Promise<string[]> {
+		const families: string[] = [];
 		const fontSet = (document.fonts || []) as unknown as FontFaceSet;
-		fontSet.forEach((fontFace: FontFace) => {
-			if (fontFace.status !== "loaded") {
-				let fontLoaded = fontFace.load().then(
-					(r) => {
-						return fontFace.family;
-					},
-					(r) => {
-						console.warn("Failed to preload font-family:", fontFace.family);
-						return fontFace.family;
-					},
-				);
-				fontPromises.push(fontLoaded);
+		if (!fontSet || typeof fontSet.forEach !== "function") {
+			return families;
+		}
+
+		for (let pass = 0; pass < FONT_LOAD_PASSES; pass++) {
+			let sawUnloaded = false;
+			const pending: Promise<void>[] = [];
+			fontSet.forEach((fontFace: FontFace) => {
+				if (fontFace.status === "unloaded") {
+					sawUnloaded = true;
+					pending.push(
+						fontFace.load().then(
+							() => {
+								families.push(fontFace.family);
+							},
+							() => {
+								console.warn("Failed to preload font-family:", fontFace.family);
+							},
+						),
+					);
+				}
+			});
+			await Promise.all(pending);
+			if (typeof document !== "undefined" && document.fonts) {
+				await document.fonts.ready;
 			}
+			if (!sawUnloaded) {
+				break;
+			}
+		}
+		return families;
+	}
+
+	/**
+	 * Preloads every source image before pagination starts.
+	 *
+	 * Float placement and overflow detection read element geometry while
+	 * content is appended — earlier than the per-page image waits run — so
+	 * images must already have their final boxes by then. Loading the URLs
+	 * up front warms the cache so cloned page images complete immediately.
+	 *
+	 * @param {DocumentFragment|Node} parsed - The parsed source content.
+	 * @returns {Promise<void>} - Resolves when all images settled (loaded,
+	 * failed, or timed out); failures only warn.
+	 */
+	async loadImages(parsed: DocumentFragment | Node): Promise<void> {
+		const root = parsed as ParentNode;
+		if (
+			typeof document === "undefined" ||
+			!root ||
+			typeof root.querySelectorAll !== "function"
+		) {
+			return;
+		}
+		const images = Array.from(root.querySelectorAll("img"));
+		await Promise.all(images.map((img) => this.preloadImage(img)));
+	}
+
+	/**
+	 * Awaits a single image's data, bounded by IMAGE_PRELOAD_TIMEOUT_MS so a
+	 * hanging request cannot stall rendering forever. Also forces eager
+	 * loading: clones of the node keep that attribute and never measure
+	 * against an empty lazy box.
+	 *
+	 * @param {HTMLImageElement} img - The image to preload.
+	 * @returns {Promise<void>} - Resolves on load, error, or timeout.
+	 */
+	private preloadImage(img: HTMLImageElement): Promise<void> {
+		img.loading = "eager";
+		return new Promise((resolve) => {
+			if (img.complete) {
+				resolve();
+				return;
+			}
+			const finish = () => resolve();
+			const timeout = setTimeout(finish, IMAGE_PRELOAD_TIMEOUT_MS);
+			img.addEventListener(
+				"load",
+				() => {
+					clearTimeout(timeout);
+					finish();
+				},
+				{ once: true },
+			);
+			img.addEventListener(
+				"error",
+				() => {
+					clearTimeout(timeout);
+					finish();
+				},
+				{ once: true },
+			);
 		});
-		return Promise.all(fontPromises).catch((err) => {
-			console.warn(err);
-		}) as unknown as Promise<string[]>;
 	}
 	/**
 	 * Cleans up and removes all rendered elements and templates.

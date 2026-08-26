@@ -120,6 +120,62 @@ const FALLBACK_ORDER: Record<string, FontCut[]> = {
     universal: ["regular"]
 };
 
+/**
+ * Bundled *metric-compatible* font families. When a run's family has no
+ * matching `@font-face`, the browser laid the text out with some local
+ * substitute; embedding a font with identical advance widths keeps every
+ * word inside its measured rect (no overlap, no drift into the next
+ * column). The per-run horizontal scaling in emitPage remains as the
+ * safety net for anything without a metric twin.
+ */
+const METRIC_COMPATIBLE_FONT_FILES: Record<
+    string,
+    Partial<Record<FontCut, string>>
+> = {
+    "liberation-serif": {
+        regular: "fonts/LiberationSerif-Regular.ttf",
+        bold: "fonts/LiberationSerif-Bold.ttf",
+        italic: "fonts/LiberationSerif-Italic.ttf",
+        boldItalic: "fonts/LiberationSerif-BoldItalic.ttf"
+    },
+    "liberation-sans": {
+        regular: "fonts/LiberationSans-Regular.ttf",
+        bold: "fonts/LiberationSans-Bold.ttf",
+        italic: "fonts/LiberationSans-Italic.ttf",
+        boldItalic: "fonts/LiberationSans-BoldItalic.ttf"
+    },
+    "liberation-mono": {
+        regular: "fonts/LiberationMono-Regular.ttf",
+        bold: "fonts/LiberationMono-Bold.ttf",
+        italic: "fonts/LiberationMono-Italic.ttf",
+        boldItalic: "fonts/LiberationMono-BoldItalic.ttf"
+    }
+};
+
+/**
+ * Requested family (lowercased, quotes stripped) -> metric-compatible
+ * bucket in METRIC_COMPATIBLE_FONT_FILES. Only families whose substitutes
+ * share advance widths are listed.
+ */
+const METRIC_FAMILY_ALIASES: Record<string, string> = {
+    "times new roman": "liberation-serif",
+    times: "liberation-serif",
+    "times roman": "liberation-serif",
+    "nimbus roman": "liberation-serif",
+    "liberation serif": "liberation-serif",
+    "tinos": "liberation-serif",
+    arial: "liberation-sans",
+    helvetica: "liberation-sans",
+    "nimbus sans": "liberation-sans",
+    "liberation sans": "liberation-sans",
+    arimo: "liberation-sans",
+    "courier new": "liberation-mono",
+    courier: "liberation-mono",
+    "nimbus mono ps": "liberation-mono",
+    "liberation mono": "liberation-mono",
+    cousine: "liberation-mono"
+};
+
 interface FontMetrics {
     /** ascent and descent in px for a given font size (from fontkit, em-scaled) */
     ascent(sizePx: number): number
@@ -150,6 +206,12 @@ interface FontSelectionContext {
     byKey: Map<FontKey, LoadedFont>
     /** bundled last-resort fonts per generic family (serif / monospace / universal). */
     fallback: Map<string, Partial<Record<FontCut, FontKey>>>
+    /**
+     * bundled metric-compatible families keyed by bucket id
+     * (METRIC_COMPATIBLE_FONT_FILES); used when a requested family has a
+     * metric twin and no @font-face matched.
+     */
+    metric: Map<string, Partial<Record<FontCut, FontKey>>>
     /** memoizes per-glyph fallback resolutions across runs. */
     glyphFallbackCache: Map<string, FontKey | null>
 }
@@ -517,10 +579,12 @@ async function loadFontSelectionContext(
     // Each cut is optional: a missing/unfetchable fallback font is skipped
     // with a warning instead of aborting the export (the document's own
     // @font-face fonts normally cover the text anyway).
-    const fallback = new Map<string, Partial<Record<FontCut, FontKey>>>();
-    for (const [generic, cuts] of Object.entries(FALLBACK_FONT_FILES)) {
+    const embedBundledCuts = async (
+        files: Partial<Record<FontCut, string>>,
+        labelForWarnings: boolean
+    ): Promise<Partial<Record<FontCut, FontKey>>> => {
         const keyedCuts: Partial<Record<FontCut, FontKey>> = {};
-        for (const [cut, path] of Object.entries(cuts)) {
+        for (const [cut, path] of Object.entries(files)) {
             try {
                 const response = await fetch(new URL(path, base));
                 if (!response.ok) {
@@ -533,14 +597,29 @@ async function loadFontSelectionContext(
                 }
                 keyedCuts[cut as FontCut] = result.key;
             } catch (error) {
-                if (generic !== "universal") {
+                if (labelForWarnings) {
                     console.warn(
                         `vivliostyle-pdf: fallback font ${path} unavailable (${error instanceof Error ? error.message : String(error)}); that cut will not be used`
                     );
                 }
             }
         }
-        fallback.set(generic, keyedCuts);
+        return keyedCuts;
+    };
+
+    const fallback = new Map<string, Partial<Record<FontCut, FontKey>>>();
+    for (const [generic, cuts] of Object.entries(FALLBACK_FONT_FILES)) {
+        fallback.set(generic, await embedBundledCuts(cuts, generic !== "universal"));
+    }
+
+    // Metric-compatible families load silently: their absence just means
+    // the run-scaling safety net handles those documents alone.
+    const metric = new Map<string, Partial<Record<FontCut, FontKey>>>();
+    for (const [bucketId, cuts] of Object.entries(METRIC_COMPATIBLE_FONT_FILES)) {
+        const keyed = await embedBundledCuts(cuts, false);
+        if (Object.keys(keyed).length > 0) {
+            metric.set(bucketId, keyed);
+        }
     }
 
     if (allRules.length === 0) {
@@ -554,7 +633,7 @@ async function loadFontSelectionContext(
         );
     }
 
-    return {rules: allRules, keyByRule, byKey, fallback, glyphFallbackCache: new Map()};
+    return {rules: allRules, keyByRule, byKey, fallback, metric, glyphFallbackCache: new Map()};
 }
 
 /** Parse the (pre-pagination) source HTML so its <style> @font-face rules
@@ -617,6 +696,11 @@ function requestedCutFor(fontWeight: string, fontStyle: string): FontCut {
  * Resolve which embedded font to draw a text run in, using CSS font matching
  * over the discovered `@font-face` rules and falling back to the bundled
  * fonts when nothing matches (or the matching font failed to embed).
+ *
+ * Between rule matching and the generic fallback sits the
+ * metric-compatible tier: when the browser substituted e.g. Times New Roman
+ * locally, embedding its metric twin (Liberation Serif) keeps drawn widths
+ * equal to the measured layout.
  */
 function resolveRunFontKey(
     ctx: FontSelectionContext,
@@ -638,9 +722,33 @@ function resolveRunFontKey(
             return key;
         }
     }
+
+    // Metric-compatible substitution: first requested family that maps to a
+    // bundled bucket with the requested cut (or any cut) loaded wins.
+    const requestedCut = requestedCutFor(fontWeight, fontStyle);
+    for (const family of familyList) {
+        const normalized = normalizeFamily(family);
+        if (!normalized) {
+            continue;
+        }
+        const bucketId =
+            METRIC_FAMILY_ALIASES[normalized.toLowerCase()] ??
+            METRIC_FAMILY_ALIASES[family.trim().toLowerCase()];
+        if (!bucketId) {
+            continue;
+        }
+        const cuts = ctx.metric.get(bucketId);
+        if (!cuts) {
+            continue;
+        }
+        const key = cuts[requestedCut] ?? cuts.regular ?? cuts.bold;
+        if (key) {
+            return key;
+        }
+    }
+
     const isMono = familyList.some(family => /mono/i.test(family));
     const generic = isMono ? "monospace" : "serif";
-    const requestedCut = requestedCutFor(fontWeight, fontStyle);
     const cutOrder = [
         requestedCut,
         ...FALLBACK_ORDER[generic].filter(cut => cut !== requestedCut)
@@ -888,6 +996,12 @@ async function emitPage(
     // (text markers become word runs, image markers are drawn afterwards).
     const markers = collectListMarkers(win, container, containerRect, fonts);
     words.push(...markers.words);
+    // Margin boxes render their @page content through CSS pseudo-elements
+    // (::after on .paged_margin-content), which likewise have no DOM text
+    // nodes — synthesize runs for page numbers and running heads here.
+    words.push(
+        ...collectMarginBoxes(win, container, containerRect, fonts)
+    );
     for (const word of words) {
         // Resolve each segment's embedded font; segments whose font could not
         // be loaded are dropped.
@@ -921,24 +1035,19 @@ async function emitPage(
                 word.color
             );
         } else {
-            // Draw the segments sequentially; each segment advances by its
-            // own font's metrics. (The browser laid the text out with its own
-            // fallback metrics for missing glyphs — small per-word drift is
-            // possible, same accepted approximation as small caps.)
-            let cursorX = xPt;
-            for (const segment of segments) {
-                page.drawText(segment.text, {
-                    x: cursorX,
-                    y: baselineY,
-                    size: sizePt,
-                    font: segment.font.pdfFont,
-                    color: word.color
-                });
-                cursorX += segment.font.pdfFont.widthOfTextAtSize(
-                    segment.text,
-                    sizePt
-                );
-            }
+            // Segments are drawn so the run ends exactly at its measured
+            // width: embedded fonts can differ in advance widths from the
+            // browser's (metric-compatible twins when available, otherwise a
+            // clamped horizontal scale per segment).
+            drawScaledSegments(
+                page,
+                segments,
+                xPt,
+                baselineY,
+                sizePt,
+                word.width * PX_TO_PT,
+                word.color
+            );
         }
         if (
             word.decoration.lineThrough ||
@@ -1452,6 +1561,87 @@ function drawSmallCapsRun(
             color
         });
         cursor += piece.advance * fit;
+    }
+}
+
+/** Horizontal scale bounds when fitting a run to its measured width. */
+const RUN_SCALE_MIN = 0.5;
+const RUN_SCALE_MAX = 2;
+/** Scales this close to 1 skip graphics-state nesting entirely. */
+const RUN_SCALE_EPSILON = 0.01;
+
+/**
+ * Draw word segments so the run's rendered width equals its measured DOM
+ * width.
+ *
+ * The embedded font may have different advance widths than the font the
+ * browser laid the text out with (metric twins narrow the gap; anything
+ * without one would otherwise drift into the following words or the next
+ * column). Each segment is drawn under a horizontal scale anchored at its
+ * start — a CTM with a=scale, e=cursorX maps local advance u onto
+ * cursorX + scale*u, the PDF `Tz` equivalent — and the cursor advances by
+ * the *scaled* widths so all segments sum exactly to the measured width.
+ */
+function drawScaledSegments(
+    page: PDFPage,
+    segments: Array<{text: string; font: LoadedFont}>,
+    xPt: number,
+    baselineY: number,
+    sizePt: number,
+    measuredWidthPt: number,
+    color: RGB
+): void {
+    const naturalWidthPt = segments.reduce(
+        (sum, segment) =>
+            sum + segment.font.pdfFont.widthOfTextAtSize(segment.text, sizePt),
+        0
+    );
+    let scale =
+        naturalWidthPt > 0 && Number.isFinite(measuredWidthPt)
+            ? measuredWidthPt / naturalWidthPt
+            : 1;
+    if (!Number.isFinite(scale)) {
+        scale = 1;
+    }
+    scale = Math.min(RUN_SCALE_MAX, Math.max(RUN_SCALE_MIN, scale));
+
+    if (Math.abs(scale - 1) <= RUN_SCALE_EPSILON) {
+        let cursorX = xPt;
+        for (const segment of segments) {
+            page.drawText(segment.text, {
+                x: cursorX,
+                y: baselineY,
+                size: sizePt,
+                font: segment.font.pdfFont,
+                color
+            });
+            cursorX += segment.font.pdfFont.widthOfTextAtSize(
+                segment.text,
+                sizePt
+            );
+        }
+        return;
+    }
+
+    let cursorX = xPt;
+    for (const segment of segments) {
+        const natural = segment.font.pdfFont.widthOfTextAtSize(
+            segment.text,
+            sizePt
+        );
+        page.pushOperators(
+            pushGraphicsState(),
+            concatTransformationMatrix(scale, 0, 0, 1, cursorX, 0)
+        );
+        page.drawText(segment.text, {
+            x: 0,
+            y: baselineY,
+            size: sizePt,
+            font: segment.font.pdfFont,
+            color
+        });
+        page.pushOperators(popGraphicsState());
+        cursorX += natural * scale;
     }
 }
 
@@ -2077,7 +2267,20 @@ function collectListMarkers(
         }
 
         if (contentProp && contentProp !== "normal" && contentProp !== "none") {
-            markerText = contentProp.replace(/^["']|["']$/g, "");
+            // Resolve generated-content functions first: computed ::marker
+            // content keeps counter() unresolved, and drawing that literally
+            // would put placeholder text over the marker position.
+            markerText = resolveGeneratedText(contentProp, {
+                doc: win.document,
+                element: el
+            });
+            if (markerText === null) {
+                markerText = markerForListStyle(
+                    style.listStyleType,
+                    () => ordinal(),
+                    () => bulletDepth(el)
+                );
+            }
         } else {
             markerText = markerForListStyle(
                 style.listStyleType,
@@ -2129,6 +2332,241 @@ function collectListMarkers(
         });
     }
     return result;
+}
+
+/**
+ * Synthesize word runs for `@page` margin boxes.
+ *
+ * Margin-box content (`@bottom-center { content: counter(page) }` etc.) is
+ * polyfilled as `::after` pseudo-element rules on `.paged_margin-content`
+ * and therefore never appears as DOM text — collectWords cannot see it.
+ * This reads the pseudo's computed style, resolves the content value and
+ * emits a run positioned inside the margin box honoring its text-align.
+ *
+ * Counter values are resolved explicitly (computed `content` keeps
+ * `counter()` unresolved): `page` from the page container's
+ * data-page-number, `pages` from the total rendered page count, and
+ * footnote-marker counters relative to their element. Anything that still
+ * looks like an unresolved function is dropped with a warning rather than
+ * drawn as literal placeholder text.
+ */
+function collectMarginBoxes(
+    win: Window,
+    container: HTMLElement,
+    containerRect: DOMRect,
+    ctx: FontSelectionContext
+): WordRun[] {
+    const words: WordRun[] = [];
+    const boxes = container.querySelectorAll<HTMLElement>(
+        ".paged_margin.hasContent .paged_margin-content"
+    );
+    const total =
+        win.document.querySelectorAll(".paged_page").length ||
+        1;
+
+    for (const contentEl of Array.from(boxes)) {
+        const margin = contentEl.parentElement;
+        if (!margin) {
+            continue;
+        }
+        const marginStyle = win.getComputedStyle(margin);
+        if (marginStyle.visibility === "hidden" || marginStyle.display === "none") {
+            continue;
+        }
+        let pseudoStyle: CSSStyleDeclaration;
+        try {
+            pseudoStyle = win.getComputedStyle(contentEl, "::after");
+        } catch {
+            continue;
+        }
+        if (!pseudoStyle || pseudoStyle.display === "none") {
+            continue;
+        }
+        const rawContent = pseudoStyle.content;
+        if (!rawContent || rawContent === "none" || rawContent === "normal") {
+            continue;
+        }
+
+        const text = resolveGeneratedText(rawContent, {
+            doc: win.document,
+            pageNumber: parseInt(container.dataset.pageNumber || "", 10),
+            totalPages: total
+        });
+        if (!text) {
+            continue;
+        }
+
+        const fontSizePx = parseFloat(pseudoStyle.fontSize);
+        if (!Number.isFinite(fontSizePx) || fontSizePx <= 0) {
+            continue;
+        }
+        const color = parseCssColor(pseudoStyle.color)?.rgb ?? rgb(0, 0, 0);
+        const fontKey = resolveRunFontKey(
+            ctx,
+            pseudoStyle.fontFamily,
+            pseudoStyle.fontWeight,
+            pseudoStyle.fontStyle
+        );
+        const segments = buildWordSegments(
+            ctx,
+            pseudoStyle.fontFamily,
+            pseudoStyle.fontWeight,
+            pseudoStyle.fontStyle,
+            fontKey,
+            text
+        );
+        // Width = sum of each segment's advance in its own font.
+        const widthPx =
+            segments.reduce(
+                (sum, seg) =>
+                    sum +
+                    (ctx.byKey.get(seg.fontKey)?.pdfFont.widthOfTextAtSize(
+                        seg.text,
+                        fontSizePx * PX_TO_PT
+                    ) ?? 0),
+                0
+            ) / PX_TO_PT;
+
+        const box = contentEl.getBoundingClientRect();
+        if (box.width === 0 && box.height === 0) {
+            continue;
+        }
+        let xInsidePx = box.left - containerRect.left +
+            (parseFloat(pseudoStyle.paddingLeft) || 0);
+        const align = (pseudoStyle.textAlign || "start").toLowerCase();
+        const availablePx = box.width -
+            (parseFloat(pseudoStyle.paddingLeft) || 0) -
+            (parseFloat(pseudoStyle.paddingRight) || 0);
+        if (align === "center") {
+            xInsidePx += Math.max(0, (availablePx - widthPx) / 2);
+        } else if (align === "right" || align === "end") {
+            xInsidePx += Math.max(0, availablePx - widthPx);
+        }
+
+        words.push({
+            text,
+            segments,
+            x: xInsidePx,
+            yTop: box.top - containerRect.top +
+                (parseFloat(pseudoStyle.paddingTop) || 0),
+            // Approximate the first line's em box, like list markers.
+            yBottom:
+                box.top - containerRect.top + fontSizePx * 1.2,
+            width: widthPx,
+            fontSizePx,
+            fontKey,
+            color,
+            decoration: {underline: null, overline: null, lineThrough: null},
+            smallCaps:
+                (pseudoStyle.fontVariantCaps || "").includes("small-caps")
+        });
+    }
+    return words;
+}
+
+/** Sources for resolving generated-content functions to concrete text. */
+interface GeneratedTextContext {
+    doc: Document
+    /** Element a marker/margin value is resolved for (footnote counters). */
+    element?: Element
+    /** 1-based number of the page being emitted. */
+    pageNumber?: number
+    /** Total number of rendered pages. */
+    totalPages?: number
+}
+
+/**
+ * Resolve a computed `content` value into plain text.
+ *
+ * Quoted strings are unescaped; `counter()`/`counters()` are resolved for
+ * the known page counters (and footnote markers via {@link context});
+ * every other function (`attr()`, leftover `string()`, unknown counters,
+ * `url()`) is dropped with a warning — drawing such tokens literally would
+ * put placeholder text on the page.
+ *
+ * @returns the resolved text, or null when nothing renderable remains.
+ */
+export function resolveGeneratedText(
+    raw: string,
+    context: GeneratedTextContext
+): string | null {
+    let out = "";
+    const tokenRe =
+        /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|([a-zA-Z-]+)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)|(-)/g;
+    let match: RegExpExecArray | null;
+    while ((match = tokenRe.exec(raw)) !== null) {
+        if (match[1]) {
+            // Quoted string literal: strip quotes and unescape \" \' \\.
+            out += match[1]
+                .slice(1, -1)
+                .replace(/\\(["'\\])/g, "$1");
+            continue;
+        }
+        if (match[2]) {
+            const fn = match[2].toLowerCase();
+            const argList = match[3] || "";
+            if (fn === "counter" || fn === "counters") {
+                const name = argList.split(",")[0].trim();
+                const resolved = resolveCounterName(
+                    name,
+                    context
+                );
+                if (resolved !== null) {
+                    out += resolved;
+                }
+            } else if (fn === "string" || fn === "attr" || fn === "url") {
+                // Normally substituted by the browser at computed-value
+                // time; reaching this means an unresolved reference.
+                console.warn(
+                    `paged-with-floats pdf: dropping unresolved content function ${fn}(${argList})`
+                );
+            }
+            // Any other function is ignored.
+            continue;
+        }
+        // Bare "-" separators between concatenated tokens are literal.
+        if (match[4] && /\s-\s/.test(match[0])) {
+            out += "-";
+        }
+    }
+    return out.length ? out : null;
+}
+
+/**
+ * Resolve a counter identifier to its string value for PDF emission.
+ * Known: page, pages, footnote-marker (ordinal of the context element among
+ * the document's footnote markers). Unknown names yield null (dropped).
+ */
+function resolveCounterName(
+    name: string,
+    context: GeneratedTextContext
+): string | null {
+    switch (name) {
+        case "page":
+            return context.pageNumber !== undefined &&
+                Number.isFinite(context.pageNumber)
+                ? String(context.pageNumber)
+                : null;
+        case "pages":
+            return context.totalPages !== undefined
+                ? String(context.totalPages)
+                : null;
+        case "footnote-marker": {
+            const el = context.element;
+            if (!el || !el.ownerDocument) {
+                return null;
+            }
+            const markers = Array.from(
+                el.ownerDocument.querySelectorAll(
+                    "[data-footnote-marker]:not([data-split-from])"
+                )
+            );
+            const index = markers.indexOf(el);
+            return index >= 0 ? String(index + 1) : null;
+        }
+        default:
+            return null;
+    }
 }
 
 /** Extract + resolve a `list-style-image` URL against the document base. */

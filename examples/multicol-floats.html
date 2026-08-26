@@ -46,14 +46,6 @@ body {
 .paged_pages { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .paged_page { background: white; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 
-
-		/* Two-column book flow (root-level multicol) … */
-		body {
-			column-count: 2;
-			column-gap: 10mm;
-			font-family: serif;
-		}
-
 		@page {
 			size: 190mm 250mm;
 			margin: 20mm;
@@ -136,10 +128,11 @@ window.PagedConfig = { auto: false };
 	<meta charset="UTF-8">
 	<title>The Malay Archipelago — floats in multicol</title>
 	<style>
-		/* Two-column book flow (root-level multicol) … */
+		/* Host-page preview styling only. The book's own CSS — including
+		   its root-level `body { column-count }` — lives in the editable
+		   source below and is processed by the polisher during pagination;
+		   the host document itself must never become a multicol container. */
 		body {
-			column-count: 2;
-			column-gap: 10mm;
 			font-family: serif;
 		}
 

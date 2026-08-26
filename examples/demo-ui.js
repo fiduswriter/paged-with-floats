@@ -3,7 +3,9 @@
  *
  * - Injects `content-visibility: auto` for rendered pages so appending
  *   page N does not re-layout pages 1..N-1 — long books stay interactive
- *   while paginating.
+ *   while paginating. The library forces the page currently being laid
+ *   out back to visible (inline style + data-paged-active), so this is
+ *   purely an optimization for finished pages.
  * - `DemoUI.addDownloadButton()`: adds a fixed "Download PDF" button that
  *   paginates this page's source in a hidden frame and saves a real
  *   vector PDF (via dist/paged.pdf.js).
@@ -11,12 +13,32 @@
  *   library's text-measurement backends (dom / pretext / fast). The chosen
  *   mode is persisted in the URL query string and used for both on-screen
  *   pagination and PDF export.
+ * - `DemoUI.addColumnSelect()`: lets the user override the number of
+ *   columns a page's root flow uses (persisted via `?columns=<n>`). The
+ *   override is injected as a `body { column-count }` rule, which the
+ *   polisher picks up exactly like author CSS — including the single-column
+ *   case, where the rule's count of 1 disables root-level multicol.
  */
 (() => {
 	const style = document.createElement("style");
 	style.textContent =
-		".paged_page{content-visibility:auto;contain-intrinsic-size:auto 1400px;}";
+		".paged_page{content-visibility:auto;contain-intrinsic-size:auto 1400px;}" +
+		".paged_page[data-paged-active]{content-visibility:visible;}";
 	document.head.appendChild(style);
+
+	// Honor an explicit ?columns= override on the live document: the injected
+	// body rule is processed by the polisher like any author CSS (captured as
+	// root-level columns; count 1 disables multicol). !important wins the
+	// capture over the author's own declaration regardless of sheet order.
+	const COLUMN_OVERRIDE_ID = "paged-demo-columns";
+	const initialColumns = new URLSearchParams(location.search).get("columns");
+	if (initialColumns !== null) {
+		const override = document.createElement("style");
+		override.id = COLUMN_OVERRIDE_ID;
+		override.textContent =
+			"body{column-count:" + initialColumns + " !important}";
+		document.head.appendChild(override);
+	}
 
 	const POLYFILL_TAG_RE =
 		/<script[^>]+src="[^"]*paged\.polyfill\.js"[^>]*>\s*<\/script>\s*/gi;
@@ -110,8 +132,39 @@
 		return { textMeasurement: "dom" };
 	}
 
-	async function generatePdf(
-		source,
+	/**
+	 * Read the column-count override from the URL query string.
+	 * @returns {{ count: number, explicit: boolean }} The requested column
+	 * count (1–4) and whether it came from an explicit `?columns=` param.
+	 */
+	function getColumnSelection() {
+		const params = new URLSearchParams(location.search);
+		const raw = params.get("columns");
+		if (raw !== null) {
+			const n = parseInt(raw, 10);
+			if (Number.isFinite(n) && n >= 1 && n <= 4) {
+				return { count: n, explicit: true };
+			}
+		}
+		return { count: 2, explicit: false };
+	}
+
+	/**
+	 * Injects a `body { column-count }` override into source HTML so the
+	 * polisher treats it exactly like author CSS (the Columns handler
+	 * captures it as root-level configuration; a count of 1 disables
+	 * multicol). Used both for the live document (before the polyfill runs)
+	 * and for the hidden print frame's copy of the source.
+	 */
+	function withColumnOverride(source, count) {
+		const override =
+			'<style data-paged-demo-columns>body{column-count:' +
+			count +
+			" !important}</style>";
+		return source.replace("</head>", override + "</head>");
+	}
+
+	async function generatePdf(		source,
 		{ title = document.title, onProgress, settings } = {},
 	) {
 		const { htmlToPDF, emitPdfFromPagedjsWindow, printHTML } =
@@ -156,6 +209,8 @@
 		generatePdf,
 		getSelectedMeasurement,
 		getMeasurementSettings,
+		getColumnSelection,
+		withColumnOverride,
 
 		/**
 		 * Adds a "Download PDF" button. The page's own source (fetched from
@@ -176,7 +231,11 @@
 				button.disabled = true;
 				button.textContent = "Generating PDF…";
 				try {
-					const source = await getSource();
+					let source = await getSource();
+					const columns = getColumnSelection();
+					if (columns.explicit) {
+						source = withColumnOverride(source, columns.count);
+					}
 					const bytes = await generatePdf(source, {
 						title,
 						settings,
@@ -197,6 +256,48 @@
 					button.textContent = original;
 				}
 			});
+		},
+
+		/**
+		 * Adds a select that switches the number of columns the page's root
+		 * flow uses. Changing the value reloads the page with a
+		 * `?columns=<n>` query parameter; the polisher reads the override
+		 * from the injected `body { column-count }` rule (same path as
+		 * author CSS), and a count of 1 disables root-level multicol.
+		 */
+		addColumnSelect({ label = "Columns" } = {}) {
+			const build = () => {
+				const bar = ensureToolbar();
+				const wrapper = document.createElement("label");
+				wrapper.style.cssText =
+					"display:flex;align-items:center;gap:6px;font-size:14px;" +
+					"padding:6px 10px;border:1px solid #333;border-radius:6px;" +
+					"background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);";
+				wrapper.textContent = label + ":";
+				const select = document.createElement("select");
+				select.style.cssText =
+					"font-size:14px;border:none;background:transparent;cursor:pointer;";
+				const current = getColumnSelection().count;
+				for (let n = 1; n <= 4; n++) {
+					const option = document.createElement("option");
+					option.value = String(n);
+					option.textContent = String(n);
+					option.selected = n === current;
+					select.appendChild(option);
+				}
+				select.addEventListener("change", () => {
+					const url = new URL(location.href);
+					url.searchParams.set("columns", select.value);
+					location.replace(url.href);
+				});
+				wrapper.appendChild(select);
+				bar.insertBefore(wrapper, bar.firstChild);
+			};
+			if (document.body) {
+				build();
+			} else {
+				document.addEventListener("DOMContentLoaded", build);
+			}
 		},
 
 		/**

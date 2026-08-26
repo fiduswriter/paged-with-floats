@@ -166,9 +166,9 @@ download(new Blob([bytes], { type: "application/pdf" }));
 The emitter is derived from
 [vivliostyle-pdf](https://github.com/fiduswriter/vivliostyle-pdf)
 (LGPL-3.0-or-later, same author). Fallback fonts for documents without
-`@font-face` rules are copied from a local vivliostyle-pdf checkout into
-`dist/fonts/` at build time when available; exports proceed without them
-otherwise. Remote images require CORS-safe URLs. See
+`@font-face` rules are bundled in `assets/fonts/` and copied to
+`dist/fonts/` at build time; exports that cannot load them proceed without
+those fallbacks. Remote images require CORS-safe URLs. See
 `examples/multicol-floats.html` for a print-ready demo combining multicol,
 page floats and footnotes.
 
