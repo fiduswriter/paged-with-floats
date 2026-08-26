@@ -2101,6 +2101,32 @@ function collectWords(
             range.setEnd(textNode, end);
             return range.getBoundingClientRect();
         };
+        const measureRangeOnLine = (
+            start: number,
+            end: number,
+            lineTop: number
+        ): DOMRect => {
+            range.setStart(textNode, start);
+            range.setEnd(textNode, end);
+            const rects = Array.from(range.getClientRects()).filter(
+                r => r.width > 0 && r.height > 0 && Math.abs(r.top - lineTop) <= 1
+            );
+            if (rects.length === 0) {
+                return range.getBoundingClientRect();
+            }
+            let left = rects[0].left;
+            let top = rects[0].top;
+            let right = rects[0].right;
+            let bottom = rects[0].bottom;
+            for (let i = 1; i < rects.length; i++) {
+                const r = rects[i];
+                left = Math.min(left, r.left);
+                top = Math.min(top, r.top);
+                right = Math.max(right, r.right);
+                bottom = Math.max(bottom, r.bottom);
+            }
+            return new DOMRect(left, top, right - left, bottom - top);
+        };
 
         // Split into words, keeping offsets so each word can be ranged
         // and measured individually. Words are further split into bidi runs
@@ -2137,6 +2163,16 @@ function collectWords(
                 // rect whose top is the first line, but the glyph itself is
                 // on the second line. Using the last rect keeps the split
                 // aligned with where the glyph is actually rendered.
+                //
+                // When measuring a fragment, ignore client rects from the
+                // other line so a character that straddles the break does not
+                // inflate the fragment to the full column width.
+                //
+                // If the fragment already ends with a hyphenation character
+                // (soft hyphen U+00AD or non-breaking hyphen U+2011), measure
+                // only the letters and either keep the existing visible hyphen
+                // or synthesize one. This prevents the letters from being
+                // stretched to fill the hyphen's reserved space.
                 const hyphenates = style.hyphens === "auto";
                 let groupStart = runStart;
                 let lineTop: number | null = null;
@@ -2153,11 +2189,27 @@ function collectWords(
                     if (lineTop === null) {
                         lineTop = charTop;
                     } else if (Math.abs(charTop - lineTop) > 1) {
-                        pushRun(
-                            text.slice(groupStart, k),
-                            measureRange(groupStart, k),
-                            hyphenates
-                        );
+                        const fragment = text.slice(groupStart, k);
+                        let runText = fragment;
+                        let runRect = measureRangeOnLine(groupStart, k, lineTop);
+                        let addHyphen = hyphenates;
+                        if (runText.endsWith("\u00AD")) {
+                            // Soft hyphen: invisible in the source but rendered
+                            // by the UA at the break. Measure the letters only
+                            // and synthesize a visible hyphen.
+                            runText = runText.slice(0, -1);
+                            runRect = measureRangeOnLine(
+                                groupStart,
+                                k - 1,
+                                lineTop
+                            );
+                            addHyphen = true;
+                        } else if (/[-\u2011]$/.test(runText)) {
+                            // A visible hyphen is already part of the DOM text;
+                            // keep it and do not synthesize another one.
+                            addHyphen = false;
+                        }
+                        pushRun(runText, runRect, addHyphen);
                         groupStart = k;
                         lineTop = charTop;
                     }
@@ -2165,7 +2217,7 @@ function collectWords(
                 if (groupStart < runEnd) {
                     pushRun(
                         text.slice(groupStart, runEnd),
-                        measureRange(groupStart, runEnd)
+                        measureRangeOnLine(groupStart, runEnd, lineTop!)
                     );
                 }
             }
