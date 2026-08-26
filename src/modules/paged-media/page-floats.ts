@@ -838,11 +838,33 @@ class PageFloats extends Handler {
 
 		let height = parseFloat(styles.height) || 0;
 
+		// Images inside a page float may still be decoding when the float is
+		// first placed. Force a layout pass and fall back to the image's
+		// natural height (scaled by width when max-width constrains it) so the
+		// float does not measure as zero and get placed in a space it will
+		// overflow once decoding finishes.
 		if (height <= 0 && element.querySelector("img")) {
-			console.warn(
-				"paged-with-floats: page float measured with zero height while containing images; " +
-					"the images may not have finished loading before measurement",
-			);
+			void element.offsetHeight;
+			styles = window.getComputedStyle(element);
+			height = parseFloat(styles.height) || 0;
+			if (height <= 0) {
+				const img = element.querySelector("img") as HTMLImageElement;
+				if (img && img.naturalWidth > 0) {
+					const styleWidth = parseFloat(window.getComputedStyle(img).width);
+					if (styleWidth > 0 && styleWidth < img.naturalWidth) {
+						height =
+							(img.naturalHeight * styleWidth) / img.naturalWidth;
+					} else {
+						height = img.naturalHeight;
+					}
+				}
+			}
+			if (height <= 0) {
+				console.warn(
+					"paged-with-floats: page float measured with zero height while containing images; " +
+						"the images may not have finished loading before measurement",
+				);
+			}
 		}
 
 		return (

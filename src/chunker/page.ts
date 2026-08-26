@@ -201,19 +201,22 @@ class Page {
 	 */
 	private buildManualColumns(
 		wrapper: HTMLDivElement,
-		rootColumns: { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string },
+		rootColumns: { count: number; gap?: string; fill?: "auto" | "balance"; ruleColor?: string; ruleStyle?: string; ruleWidth?: string },
 	): void {
 		const count = Math.floor(rootColumns.count);
 		const gap =
 			rootColumns.gap !== undefined && rootColumns.gap !== "normal"
 				? rootColumns.gap
 				: "1em";
+		const fill = rootColumns.fill || "balance";
 
 		wrapper.dataset.rootColumns = String(count);
+		wrapper.dataset.rootColumnFill = fill;
 
 		const columnsHost = document.createElement("div");
 		columnsHost.classList.add("paged_columns");
 		columnsHost.style.gap = gap;
+		columnsHost.dataset.pagedColumnFill = fill;
 
 		for (let i = 0; i < count; i++) {
 			const column = document.createElement("div");

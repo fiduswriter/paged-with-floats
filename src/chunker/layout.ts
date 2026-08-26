@@ -286,6 +286,150 @@ export function rebalanceMulticolFinals(
 	return rebalanced;
 }
 
+/**
+ * Re-balances the final row of root-level manual columns.
+ *
+ * Manual columns are filled sequentially by the layout engine. On the last
+ * page this often leaves the right-hand columns nearly empty while the
+ * left-hand column holds the remaining content. When the author asked for
+ * `column-fill: balance` (the CSS default), the final row is converted back
+ * into a native CSS multi-column container for that page only; the browser
+ * then distributes the remaining content evenly. If balancing would re-
+ * introduce overflow, the row is left in its sequential layout.
+ *
+ * @param pagesArea - The element containing all rendered pages.
+ * @returns The number of rows that were re-balanced.
+ */
+export function rebalanceManualColumnFinals(
+	pagesArea?: HTMLElement | null,
+): number {
+	if (!pagesArea) {
+		return 0;
+	}
+
+	const pages = Array.from(
+		pagesArea.querySelectorAll<HTMLElement>(".paged_page"),
+	);
+	let lastPage: HTMLElement | null = null;
+	for (let i = pages.length - 1; i >= 0; i--) {
+		const rows = pages[i].querySelectorAll(
+			":scope .paged_flow > .paged_columns",
+		);
+		if (rows.length > 0) {
+			lastPage = pages[i];
+			break;
+		}
+	}
+	if (!lastPage) {
+		return 0;
+	}
+
+	const rows = Array.from(
+		lastPage.querySelectorAll<HTMLElement>(
+			":scope .paged_flow > .paged_columns",
+		),
+	);
+	const row = rows[rows.length - 1];
+	if (!row || !row.hasChildNodes()) {
+		return 0;
+	}
+
+	const columns = Array.from(
+		row.querySelectorAll<HTMLElement>(":scope > .paged_column"),
+	);
+	if (columns.length <= 1) {
+		return 0;
+	}
+
+	const fill = row.dataset.pagedColumnFill || "balance";
+	if (fill === "auto") {
+		return 0;
+	}
+
+	const savedRowStyles = {
+		display: row.style.display,
+		height: row.style.height,
+		minHeight: row.style.minHeight,
+		flex: row.style.flex,
+		columnCount: row.style.columnCount,
+		columnGap: row.style.columnGap,
+		columnFill: row.style.columnFill,
+		columnRule: row.style.columnRule,
+	};
+	const savedColumnStyles = new Map<
+		HTMLElement,
+		{
+			display: string;
+			height: string;
+			flex: string;
+			width: string;
+			borderLeft: string;
+		}
+	>();
+	const gap = row.style.gap || row.style.columnGap || "1em";
+
+	row.style.display = "block";
+	row.style.height = "auto";
+	row.style.minHeight = "0";
+	row.style.flex = "";
+	row.style.columnCount = String(columns.length);
+	row.style.columnGap = gap;
+	row.style.columnFill = "balance";
+
+	columns.forEach((col) => {
+		savedColumnStyles.set(col, {
+			display: col.style.display,
+			height: col.style.height,
+			flex: col.style.flex,
+			width: col.style.width,
+			borderLeft: col.style.borderLeft,
+		});
+		col.style.display = "contents";
+		col.style.height = "auto";
+		col.style.flex = "";
+		col.style.width = "";
+		col.style.borderLeft = "";
+	});
+
+	const secondColumn = columns[1];
+	if (secondColumn && secondColumn.style.borderLeft) {
+		row.style.columnRule = secondColumn.style.borderLeft;
+	}
+
+	row.getBoundingClientRect();
+	const pageContent = row.closest(".paged_page_content") as HTMLElement | null;
+	const pageBottom = pageContent
+		? pageContent.getBoundingClientRect().bottom
+		: Infinity;
+	const rowRect = row.getBoundingClientRect();
+	const spills =
+		row.scrollWidth > row.clientWidth + COLUMN_EPSILON ||
+		row.scrollHeight > row.clientHeight + COLUMN_EPSILON ||
+		rowRect.bottom > pageBottom + COLUMN_EPSILON;
+
+	if (spills) {
+		row.style.display = savedRowStyles.display;
+		row.style.height = savedRowStyles.height;
+		row.style.minHeight = savedRowStyles.minHeight;
+		row.style.flex = savedRowStyles.flex;
+		row.style.columnCount = savedRowStyles.columnCount;
+		row.style.columnGap = savedRowStyles.columnGap;
+		row.style.columnFill = savedRowStyles.columnFill;
+		row.style.columnRule = savedRowStyles.columnRule;
+		columns.forEach((col) => {
+			const saved = savedColumnStyles.get(col)!;
+			col.style.display = saved.display;
+			col.style.height = saved.height;
+			col.style.flex = saved.flex;
+			col.style.width = saved.width;
+			col.style.borderLeft = saved.borderLeft;
+		});
+	} else {
+		row.dataset.pagedManualColumnsBalanced = "";
+	}
+	return spills ? 0 : 1;
+}
+
 function countWords(text: string): number {
 	let count = 0;
 	let inWord = false;
@@ -562,7 +706,7 @@ class Layout {
 	 */
 	private startSpanRow(wrapper: HTMLElement): HTMLElement[] {
 		const rootColumns = this.settings.rootColumns as
-			| { count: number; gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string }
+			| { count: number; gap?: string; fill?: "auto" | "balance"; ruleColor?: string; ruleStyle?: string; ruleWidth?: string }
 			| undefined;
 		const count =
 			rootColumns && rootColumns.count > 1
@@ -571,14 +715,16 @@ class Layout {
 		if (count <= 1) {
 			return [wrapper];
 		}
-		const config = rootColumns as { gap?: string; ruleColor?: string; ruleStyle?: string; ruleWidth?: string };
+		const config = rootColumns as { gap?: string; fill?: "auto" | "balance"; ruleColor?: string; ruleStyle?: string; ruleWidth?: string };
 		const gap =
 			config.gap !== undefined && config.gap !== "normal"
 				? config.gap
 				: "1em";
+		const fill = config.fill || "balance";
 		const row = document.createElement("div");
 		row.classList.add("paged_columns");
 		row.style.gap = gap;
+		row.dataset.pagedColumnFill = fill;
 		for (let i = 0; i < count; i++) {
 			const column = document.createElement("div");
 			column.classList.add("paged_column");
@@ -661,12 +807,20 @@ class Layout {
 		// refreshBounds, but callers may read this.bounds directly).
 		const elRect = dest.getBoundingClientRect();
 		if (dest.classList.contains("paged_column") && dest.closest(".paged_flow")) {
-			const hostRect = dest.closest(".paged_flow")!.getBoundingClientRect();
+			const flow = dest.closest(".paged_flow")!;
+			const hostRect = flow.getBoundingClientRect();
+			const topFloat = flow.querySelector(
+				":scope > .paged_float_top",
+			) as HTMLElement | null;
+			const topFloatHeight = topFloat
+				? topFloat.getBoundingClientRect().height
+				: 0;
+			const availableHeight = Math.max(0, hostRect.height - topFloatHeight);
 			this.bounds = new DOMRect(
 				elRect.left,
-				hostRect.top,
+				hostRect.top + topFloatHeight,
 				elRect.width,
-				hostRect.height,
+				availableHeight,
 			);
 		} else {
 			this.bounds = this.refreshBounds();
@@ -741,14 +895,20 @@ class Layout {
 				// Manual columns are content-sized; overflow is detected
 				// against the flow host's vertical extent (the visible page
 				// region), while the horizontal extent is the column's own.
-				const hostRect = this.element
-					.closest(".paged_flow")!
-					.getBoundingClientRect();
+				const flow = this.element.closest(".paged_flow")!;
+				const hostRect = flow.getBoundingClientRect();
+				const topFloat = flow.querySelector(
+					":scope > .paged_float_top",
+				) as HTMLElement | null;
+				const topFloatHeight = topFloat
+					? topFloat.getBoundingClientRect().height
+					: 0;
+				const availableHeight = Math.max(0, hostRect.height - topFloatHeight);
 				this.bounds = new DOMRect(
 					elRect.left,
-					hostRect.top,
+					hostRect.top + topFloatHeight,
 					elRect.width,
-					hostRect.height,
+					availableHeight,
 				);
 			} else {
 				this.bounds = elRect;
@@ -1101,7 +1261,23 @@ class Layout {
 			forcedBreakQueue = prevBreakToken.getForcedBreakQueue();
 		}
 
+		let mainLoopGuard = 0;
 		while (!done && !newBreakToken) {
+			if (++mainLoopGuard > 10000) {
+				console.error(
+					"paged-with-floats: layout main loop guard exceeded; bailing out. node=",
+					node?.nodeName,
+					"done=",
+					done,
+					"newBreakToken=",
+					newBreakToken,
+				);
+				this.failed = true;
+				return new RenderResult(
+					undefined,
+					("Layout main loop guard exceeded") as unknown as Error,
+				);
+			}
 			next = walker.next();
 			node = next.value;
 			done = next.done;
@@ -1452,6 +1628,9 @@ class Layout {
 		let fragment: DocumentFragment | undefined;
 
 		breakToken.overflow.forEach((overflow) => {
+			if (!overflow || !overflow.content) {
+				return;
+			}
 			// A handy way to dump the contents of a fragment.
 			// console.log([].map.call(overflow.content.children, e => e.outerHTML).join('\n'));
 
@@ -1469,11 +1648,14 @@ class Layout {
 			let addTo = overflow.ancestor
 				? findElement(overflow.ancestor, fragment)
 				: fragment;
-			this.addOverflowNodes(addTo as HTMLElement, overflow.content!);
+			this.addOverflowNodes(addTo as HTMLElement, overflow.content);
 		});
 
 		// Record refs.
-		Array.from(fragment!.querySelectorAll("[data-ref]")).forEach((ref) => {
+		if (!fragment) {
+			return;
+		}
+		Array.from(fragment.querySelectorAll("[data-ref]")).forEach((ref) => {
 			let refId = ref.dataset.ref;
 			if (!dest.querySelector(`[data-ref='${refId}']`)) {
 				let refs = (dest as WithRefs).indexOfRefs;
@@ -1952,7 +2134,14 @@ class Layout {
 			overflow: Range[] = [];
 
 		let overflowResult = this.findOverflow(rendered, bounds, source);
+		let findOverflowGuard = 0;
 		while (overflowResult) {
+			if (++findOverflowGuard > 100) {
+				console.error(
+					"paged-with-floats: overflow collection guard exceeded; bailing out.",
+				);
+				break;
+			}
 			const result = overflowResult;
 			// Check whether overflow already added - multiple overflows might result in the
 			// same range via avoid break rules.
@@ -2107,16 +2296,19 @@ class Layout {
 	 */
 	hasOverflow(element: HTMLElement, bounds: DOMRect = this.bounds): boolean {
 		let constrainingElement = element && (element.parentNode as Element); // this gets the element, instead of the wrapper for the width workaround
+		const isManualColumn =
+			constrainingElement &&
+			constrainingElement.classList.contains("paged_columns");
 		if (
 			constrainingElement &&
 			(constrainingElement.classList.contains("paged_page_content") ||
 				// A manual column's content overflow does not grow the flex
 				// row it sits in; measure the column box itself.
-				constrainingElement.classList.contains("paged_columns"))
+				isManualColumn)
 		) {
 			constrainingElement = element;
 		}
-		let { width, height } = element.getBoundingClientRect();
+		let { width, height, bottom } = element.getBoundingClientRect();
 		let scrollWidth = constrainingElement ? constrainingElement.scrollWidth : 0;
 		let scrollHeight = constrainingElement
 			? constrainingElement.scrollHeight
@@ -2127,6 +2319,10 @@ class Layout {
 		) {
 			return true;
 		}
+		// Manual columns are positioned below any top page floats, so their
+		// box can grow past the flow host's bottom edge while their height is
+		// still smaller than the host's height. Detect that by comparing the
+		// column's bottom edge to the host's bottom edge.
 
 		// Multicol blocks fragment internally: their spill-over lands in a
 		// hidden extra column (scrollWidth) or beyond a constrained height

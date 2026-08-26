@@ -4,7 +4,7 @@ import Hook from "../utils/hook.js";
 import Chunker from "../chunker/chunker.js";
 import Polisher from "../polisher/polisher.js";
 import type { PolisherHooks } from "../polisher/polisher.js";
-import { validateRenderedPages, rebalanceMulticolFinals, type OverflowViolation } from "../chunker/layout.js";
+import { validateRenderedPages, rebalanceMulticolFinals, rebalanceManualColumnFinals, type OverflowViolation } from "../chunker/layout.js";
 import type Page from "../chunker/page.js";
 
 import { initializeHandlers, registerHandlers } from "../utils/handlers.js";
@@ -305,6 +305,7 @@ class Previewer {
 		// Release height constraints on final multicol fragments so their
 		// columns balance (column-fill: balance behavior on last pages).
 		rebalanceMulticolFinals(this.chunker.pagesArea);
+		rebalanceManualColumnFinals(this.chunker.pagesArea);
 
 		flow.performance = endTime - startTime;
 		flow.size = this.size;

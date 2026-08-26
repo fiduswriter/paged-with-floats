@@ -11,6 +11,7 @@ interface RuleContext {
 interface RootColumnCssConfig {
 	count?: number
 	gap?: string
+	fill?: "auto" | "balance"
 	ruleColor?: string
 	ruleStyle?: string
 	ruleWidth?: string
@@ -174,6 +175,10 @@ class Columns extends Handler {
 						this.rootColumnsFromCss.count = count;
 						this.rootColumnsCountLocked = !!declaration.important;
 					}
+				}
+			} else if (property === "column-fill") {
+				if (value === "auto" || value === "balance") {
+					this.rootColumnsFromCss.fill = value;
 				}
 			} else if (property === "column-gap") {
 				this.rootColumnsFromCss.gap =

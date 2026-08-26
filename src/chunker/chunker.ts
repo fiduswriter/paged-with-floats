@@ -142,6 +142,7 @@ const TEMPLATE = `
 export interface RootColumnConfig {
 	count: number;
 	gap?: string;
+	fill?: "auto" | "balance";
 	ruleColor?: string;
 	ruleStyle?: string;
 	ruleWidth?: string;
@@ -265,6 +266,7 @@ class Chunker {
 			return {
 				count: Math.floor(Number(fromSettings.count)),
 				gap: fromSettings.gap,
+				fill: fromSettings.fill,
 				ruleColor: fromSettings.ruleColor,
 				ruleStyle: fromSettings.ruleStyle,
 				ruleWidth: fromSettings.ruleWidth,
@@ -278,6 +280,7 @@ class Chunker {
 			return {
 				count: Math.floor(Number(fromCss.count)),
 				gap: fromCss.gap,
+				fill: fromCss.fill,
 				ruleColor: fromCss.ruleColor,
 				ruleStyle: fromCss.ruleStyle,
 				ruleWidth: fromCss.ruleWidth,
@@ -294,9 +297,11 @@ class Chunker {
 			const style = window.getComputedStyle(el);
 			const count = parseInt(style.columnCount);
 			if (count > 1) {
+				const fill = style.columnFill as "auto" | "balance" | "balance-all";
 				return {
 					count,
 					gap: style.columnGap !== "normal" ? style.columnGap : undefined,
+					fill: fill === "auto" || fill === "balance" ? fill : undefined,
 					ruleColor: style.columnRuleColor,
 					ruleStyle: style.columnRuleStyle,
 					ruleWidth: style.columnRuleWidth,
@@ -1140,13 +1145,19 @@ class Chunker {
 	private preloadImage(img: HTMLImageElement): Promise<void> {
 		img.loading = "eager";
 		return new Promise((resolve) => {
-			if (img.complete) {
+			// Images in a detached DocumentFragment may not have started
+			// loading yet (complete is true with naturalWidth === 0). Use a
+			// dedicated loader so the browser actually fetches and decodes the
+			// data before pagination starts; clones inserted during layout then
+			// resolve from cache immediately.
+			if (img.complete && img.naturalWidth > 0) {
 				resolve();
 				return;
 			}
 			const finish = () => resolve();
 			const timeout = setTimeout(finish, IMAGE_PRELOAD_TIMEOUT_MS);
-			img.addEventListener(
+			const loader = new Image();
+			loader.addEventListener(
 				"load",
 				() => {
 					clearTimeout(timeout);
@@ -1154,7 +1165,7 @@ class Chunker {
 				},
 				{ once: true },
 			);
-			img.addEventListener(
+			loader.addEventListener(
 				"error",
 				() => {
 					clearTimeout(timeout);
@@ -1162,6 +1173,7 @@ class Chunker {
 				},
 				{ once: true },
 			);
+			loader.src = img.src;
 		});
 	}
 	/**

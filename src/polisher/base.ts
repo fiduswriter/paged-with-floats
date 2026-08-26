@@ -418,10 +418,13 @@ export default `
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow {
 	height: inherit;
 	position: relative;
+	display: flex;
+	flex-direction: column;
 }
 
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_top {
 	width: 100%;
+	flex: 0 0 auto;
 }
 
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_bottom {
@@ -433,15 +436,18 @@ export default `
 
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_columns {
 	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
 }
 
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_columns > .paged_column {
 	flex: 0 0 auto;
-	height: auto;
+	height: 100%;
 }
 
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_spacer {
 	height: auto;
+	flex: 0 0 auto;
 }
 
 /* Safety net: the host document must never be a CSS multi-column container.
