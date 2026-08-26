@@ -2707,7 +2707,10 @@ class Layout {
 			// See if we can move some of the content above into the overflow.
 			let newPreviousElement = nodeBefore(previousElement, rendered, true);
 			// Don't go back into stuff already rendered.
-			if (!newPreviousElement || (newPreviousElement as Element).dataset.splitFrom) {
+			if (
+				!newPreviousElement ||
+				(isElement(newPreviousElement) && (newPreviousElement as Element).dataset.splitFrom)
+			) {
 				shouldContinue = false;
 			} else {
 				newRangeStart = previousElement;

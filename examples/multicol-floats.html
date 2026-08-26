@@ -46,61 +46,6 @@ body {
 .paged_pages { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .paged_page { background: white; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 
-		@page {
-			size: 190mm 250mm;
-			margin: 20mm;
-
-			@top-center {
-				content: string(chapter);
-				font-size: 0.8em;
-				font-style: italic;
-			}
-			@bottom-center {
-				content: counter(page);
-				font-size: 0.8em;
-			}
-		}
-
-		h2 {
-			string-set: chapter content();
-			margin-top: 0;
-			break-after: avoid;
-		}
-
-		/* … with page floats: figures are pulled to the top of the page
-		   their anchor appears on, spanning the full page width across
-		   both columns, while column text continues beneath them. */
-		figure.topfloat {
-			float-reference: page;
-			float: top;
-			float-min-wrap-block: 40mm;
-			margin: 0 0 10px 0;
-			text-align: center;
-		}
-		figcaption {
-			font-size: 0.85em;
-			font-style: italic;
-			margin-top: 6px;
-		}
-
-		/* Footnotes collect at the bottom of the page, below all columns. */
-		.footnote {
-			float: footnote;
-			font-size: 0.8em;
-		}
-		::footnote-call {
-			font-size: 0.7em;
-			vertical-align: super;
-		}
-		::footnote-marker {
-			font-weight: bold;
-		}
-
-		p {
-			text-align: justify;
-			hyphens: auto;
-		}
-
 </style>
 <script src="demo-ui.js"></script>
 <script>

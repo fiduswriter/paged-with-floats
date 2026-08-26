@@ -444,6 +444,17 @@ export default `
 	height: auto;
 }
 
+/* Safety net: the host document must never be a CSS multi-column container.
+   Author rules on the book fragment are stripped by the Columns handler, but
+   demo/host CSS or inline styles can still set column-count on body/html and
+   break the manual column engine. This reset is intentionally !important so
+   it cannot be overridden by stray host styles. */
+html, body {
+	column-count: auto !important;
+	column-width: auto !important;
+	columns: auto !important;
+}
+
 .paged_pagebox > .paged_area > .paged_footnote_area {
 	position: relative;
 	overflow: hidden;
