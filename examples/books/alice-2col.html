@@ -60,6 +60,10 @@ p { margin: 0 0 4pt 0; }
 </style>
 <script src="../demo-ui.js"></script>
 <script>
+	DemoUI.addMeasurementSelect();
+	window.PagedConfig = {
+		settings: DemoUI.getMeasurementSettings()
+	};
 	document.addEventListener("DOMContentLoaded", () => {
 		DemoUI.addDownloadButton({ title: 'Alice’s Adventures in Wonderland' });
 	});

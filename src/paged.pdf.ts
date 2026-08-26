@@ -96,6 +96,10 @@ export async function htmlToPDF(
 		polyfillURL: options.polyfillURL,
 		settings: options.settings,
 		keepIframe: true,
+		printCallback: () => {
+			// htmlToPDF emits the PDF programmatically; do not open the browser
+			// print dialog.
+		},
 		errorCallback: (message: string) => {
 			throw new Error(message);
 		},

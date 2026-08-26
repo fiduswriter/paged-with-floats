@@ -7,6 +7,10 @@
  * - `DemoUI.addDownloadButton()`: adds a fixed "Download PDF" button that
  *   paginates this page's source in a hidden frame and saves a real
  *   vector PDF (via dist/paged.pdf.js).
+ * - `DemoUI.addMeasurementSelect()`: lets the user switch between the
+ *   library's text-measurement backends (dom / pretext / fast). The chosen
+ *   mode is persisted in the URL query string and used for both on-screen
+ *   pagination and PDF export.
  */
 (() => {
 	const style = document.createElement("style");
@@ -75,9 +79,40 @@
 		return new URL("./", location.href).href;
 	}
 
+	/**
+	 * Read the measurement mode from the URL query string.
+	 * @returns {"dom" | "pretext" | "fast"}
+	 */
+	function getSelectedMeasurement() {
+		const params = new URLSearchParams(location.search);
+		const mode = params.get("measurement");
+		if (mode === "pretext" || mode === "fast") {
+			return mode;
+		}
+		return "dom";
+	}
+
+	/**
+	 * Convert a measurement mode into the Previewer settings object used by
+	 * both on-screen pagination and PDF export.
+	 *
+	 * - "dom": legacy DOM-walking measurement (default).
+	 * - "pretext": canvas/Intl-predicted breaks with DOM verification.
+	 * - "fast": pretext predicted breaks without per-break verification.
+	 */
+	function getMeasurementSettings(mode = getSelectedMeasurement()) {
+		if (mode === "fast") {
+			return { textMeasurement: "pretext", verifyTextPrediction: false };
+		}
+		if (mode === "pretext") {
+			return { textMeasurement: "pretext" };
+		}
+		return { textMeasurement: "dom" };
+	}
+
 	async function generatePdf(
 		source,
-		{ title = document.title, onProgress } = {},
+		{ title = document.title, onProgress, settings } = {},
 	) {
 		const { htmlToPDF, emitPdfFromPagedjsWindow, printHTML } =
 			await import(new URL("paged.pdf.js", bundleBase()).href);
@@ -89,6 +124,7 @@
 					bundleBase(),
 				).href,
 				metadata: { title },
+				settings,
 			});
 		}
 		// With progress reporting: keep the print frame around and feed
@@ -99,6 +135,7 @@
 				title,
 				polyfillURL: new URL("paged.polyfill.js", bundleBase()).href,
 				keepIframe: true,
+				settings,
 				errorCallback: reject,
 				printCallback: (win) => {
 					emitPdfFromPagedjsWindow(win, onProgress, {
@@ -117,6 +154,9 @@
 
 	const DemoUI = {
 		generatePdf,
+		getSelectedMeasurement,
+		getMeasurementSettings,
+
 		/**
 		 * Adds a "Download PDF" button. The page's own source (fetched from
 		 * the server) is re-paginated in a hidden frame and emitted as PDF.
@@ -125,6 +165,7 @@
 			label = "Download PDF",
 			filename,
 			title = document.title,
+			settings = getMeasurementSettings(),
 		} = {}) {
 			const bar = ensureToolbar();
 			const button = makeButton(label);
@@ -138,6 +179,7 @@
 					const source = await getSource();
 					const bytes = await generatePdf(source, {
 						title,
+						settings,
 						onProgress: (message) => {
 							button.textContent = message;
 						},
@@ -155,6 +197,55 @@
 					button.textContent = original;
 				}
 			});
+		},
+
+		/**
+		 * Adds a select that switches the text-measurement backend. Changing the
+		 * value reloads the page with a `?measurement=<mode>` query parameter so
+		 * the polyfill re-renders using the chosen backend.
+		 */
+		addMeasurementSelect({ label = "Text measurement" } = {}) {
+			const build = () => {
+				const bar = ensureToolbar();
+				const wrapper = document.createElement("label");
+				wrapper.style.cssText =
+					"display:flex;align-items:center;gap:6px;font-size:14px;" +
+					"padding:6px 10px;border:1px solid #333;border-radius:6px;" +
+					"background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);";
+				wrapper.textContent = label + ":";
+				const select = document.createElement("select");
+				select.style.cssText =
+					"font-size:14px;border:none;background:transparent;cursor:pointer;";
+				const modes = [
+					{ value: "dom", text: "DOM (legacy)" },
+					{ value: "pretext", text: "Pretext (verified)" },
+					{ value: "fast", text: "Pretext (fast)" },
+				];
+				const current = getSelectedMeasurement();
+				for (const mode of modes) {
+					const option = document.createElement("option");
+					option.value = mode.value;
+					option.textContent = mode.text;
+					option.selected = mode.value === current;
+					select.appendChild(option);
+				}
+				select.addEventListener("change", () => {
+					const url = new URL(location.href);
+					if (select.value === "dom") {
+						url.searchParams.delete("measurement");
+					} else {
+						url.searchParams.set("measurement", select.value);
+					}
+					location.replace(url.href);
+				});
+				wrapper.appendChild(select);
+				bar.insertBefore(wrapper, bar.firstChild);
+			};
+			if (document.body) {
+				build();
+			} else {
+				document.addEventListener("DOMContentLoaded", build);
+			}
 		},
 
 		getSource,

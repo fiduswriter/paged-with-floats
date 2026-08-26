@@ -4,9 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const from =
-	process.env.PDF_FONTS_SRC ||
-	join(root, "..", "fiduswriter", "vivliostyle-pdf", "public", "fonts");
+const from = process.env.PDF_FONTS_SRC || join(root, "assets", "fonts");
 const to = join(root, "dist", "fonts");
 
 mkdirSync(to, { recursive: true });
@@ -17,6 +15,7 @@ const fonts = [
 	"LibertinusSerif-BoldItalic.ttf",
 	"JetBrainsMono-Regular.ttf",
 	"JetBrainsMono-Bold.ttf",
+	"DejaVuSans.ttf",
 ];
 let copied = 0;
 for (const f of fonts) {
@@ -24,8 +23,8 @@ for (const f of fonts) {
 		copyFileSync(join(from, f), join(to, f));
 		copied++;
 	} catch {
-		// Source tree unavailable (e.g. CI): export proceeds with the
-		// document's own @font-face fonts and skips unavailable fallbacks.
+		// Source font unavailable (e.g. trimmed checkout): export proceeds with
+		// the document's own @font-face fonts and skips unavailable fallbacks.
 	}
 }
 console.log(`pdf fonts: ${copied}/${fonts.length} copied to dist/fonts`);
