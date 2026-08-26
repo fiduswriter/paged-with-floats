@@ -109,12 +109,12 @@ class Previewer {
 	wrapContent() {
 		let body = document.querySelector("body");
 		let template = body.querySelector(
-			":scope > template[data-ref='pagedjs-content']",
+			":scope > template[data-ref='paged-content']",
 		);
 
 		if (!template) {
 			template = document.createElement("template");
-			template.dataset.ref = "pagedjs-content";
+			template.dataset.ref = "paged-content";
 			template.innerHTML = body.innerHTML;
 			body.innerHTML = "";
 			body.appendChild(template);
@@ -133,12 +133,12 @@ class Previewer {
 	removeStyles(doc = document) {
 		const stylesheets = Array.from(
 			doc.querySelectorAll(
-				"link[rel='stylesheet']:not([data-pagedjs-ignore], [media~='screen'])",
+				"link[rel='stylesheet']:not([data-paged-ignore], [media~='screen'])",
 			),
 		);
 		const inlineStyles = Array.from(
 			doc.querySelectorAll(
-				"style:not([data-pagedjs-inserted-styles], [data-pagedjs-ignore], [media~='screen'])",
+				"style:not([data-paged-inserted-styles], [data-paged-ignore], [media~='screen'])",
 			),
 		);
 		const elements = [...stylesheets, ...inlineStyles];

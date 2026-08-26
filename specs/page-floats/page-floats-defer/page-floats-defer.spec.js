@@ -14,18 +14,18 @@ describe("page-floats-defer", () => {
 	});
 
 	it("should render 2 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toEqual(2);
 	});
 
 	it("should defer the float to the top of page 2", async () => {
-		let info = await page.$eval(".pagedjs_pages", (pagesArea) => {
+		let info = await page.$eval(".paged_pages", (pagesArea) => {
 			let pg1 = pagesArea.querySelector("[data-page-number='1']");
 			let pg2 = pagesArea.querySelector("[data-page-number='2']");
-			let big = pg2.querySelector(".pagedjs_float_top #big");
-			let content2 = pg2.querySelector(".pagedjs_page_content");
+			let big = pg2.querySelector(".paged_float_top #big");
+			let content2 = pg2.querySelector(".paged_page_content");
 			return {
-				pg1Deferred: pg1.querySelector(".pagedjs_float_top").children.length,
+				pg1Deferred: pg1.querySelector(".paged_float_top").children.length,
 				inPg2: !!big,
 				bigTop: big ? big.getBoundingClientRect().top : null,
 				content2Top: content2.getBoundingClientRect().top,
@@ -37,7 +37,7 @@ describe("page-floats-defer", () => {
 	});
 
 	it("should keep following content on page 1", async () => {
-		let texts = await page.$$eval(".pagedjs_page", (pages) =>
+		let texts = await page.$$eval(".paged_page", (pages) =>
 			pages.map((p) => p.textContent)
 		);
 		expect(texts[0]).toContain("following the deferred float");

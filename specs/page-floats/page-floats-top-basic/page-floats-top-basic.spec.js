@@ -14,18 +14,18 @@ describe("page-floats-top-basic", () => {
 	});
 
 	it("should render 2 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toEqual(2);
 	});
 
 	it("should place the figure in the top float container of page 1", async () => {
 		let info = await page.$eval("[data-page-number='1']", (pg) => {
-			let top = pg.querySelector(".pagedjs_float_top");
+			let top = pg.querySelector(".paged_float_top");
 			let fig = top.querySelector("#float-a");
-			let content = pg.querySelector(".pagedjs_page_content");
+			let content = pg.querySelector(".paged_page_content");
 			let flowChildren = Array.from(content.children).filter(
-				(d) => !d.classList.contains("pagedjs_float_top") &&
-					!d.classList.contains("pagedjs_float_bottom")
+				(d) => !d.classList.contains("paged_float_top") &&
+					!d.classList.contains("paged_float_bottom")
 			);
 			return {
 				inContainer: !!fig,
@@ -46,7 +46,7 @@ describe("page-floats-top-basic", () => {
 	});
 
 	it("should move the last paragraph to page 2", async () => {
-		let texts = await page.$$eval(".pagedjs_page", (pages) =>
+		let texts = await page.$$eval(".paged_page", (pages) =>
 			pages.map((p) => p.textContent)
 		);
 		expect(texts[0]).not.toContain("spilling to the next page");
@@ -55,7 +55,7 @@ describe("page-floats-top-basic", () => {
 
 	it("should leave the top container of page 2 empty", async () => {
 		let count = await page.$eval(
-			"[data-page-number='2'] .pagedjs_float_top",
+			"[data-page-number='2'] .paged_float_top",
 			(t) => t.children.length
 		);
 		expect(count).toEqual(0);

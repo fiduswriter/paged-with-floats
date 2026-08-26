@@ -14,7 +14,7 @@ describe("multiple-named", () => {
 	});
 
 	it("should put contet and preamble on a single page", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -30,7 +30,7 @@ describe("multiple-named", () => {
 
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

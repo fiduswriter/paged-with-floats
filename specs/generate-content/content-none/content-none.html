@@ -184,14 +184,14 @@
       body {
           background-color: var(--background);
       }
-      .pagedjs_pages {
+      .paged_pages {
           display: flex;
-          width: calc(var(--pagedjs-width) * 2);
+          width: calc(var(--paged-width) * 2);
           flex: 0;
           flex-wrap: wrap;
           margin: 0 auto;
       }
-      .pagedjs_page {
+      .paged_page {
           background: var(--color-paper);
           box-shadow: 0 0 0 1px inset var(--color-page-box);
           margin: 0;
@@ -200,13 +200,13 @@
           margin-top: 10mm;
 
       }
-      .pagedjs_first_page {
-          margin-left: var(--pagedjs-width);
+      .paged_first_page {
+          margin-left: var(--paged-width);
       }
 
       /* show the margin-box */
 
-      [class*="pagedjs_margin-top"],  [class*="pagedjs_margin-left"],   [class*="pagedjs_margin-right"],   [class*="pagedjs_margin-bottom"]    {
+      [class*="paged_margin-top"],  [class*="paged_margin-left"],   [class*="paged_margin-right"],   [class*="paged_margin-bottom"]    {
         box-shadow: 0 0 0 var(--size-margin-box) inset var(--color-margin-box);
       }
     }

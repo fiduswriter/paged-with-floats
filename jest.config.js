@@ -2,6 +2,11 @@ export default {
 	testMatch: ["**/?(*.)(test).js"],
 	testEnvironment: "jsdom",
 	transform: {
-		"\\.js$": ["babel-jest", { configFile: "./babel-jest.config.json" }]
+		"\\.(js|ts)$": ["babel-jest", { configFile: "./babel-jest.config.json" }]
 	},
+	moduleNameMapper: {
+		"^(\\.{1,2}/.*)\\.js$": "$1",
+		"^@chenglou/pretext$":
+			"<rootDir>/src/utils/__mocks__/pretext-stub.cjs"
+	}
 };

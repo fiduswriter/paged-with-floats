@@ -14,12 +14,12 @@ describe("pre", () => {
 	});
 
 	it("should render 4 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toBe(4);
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

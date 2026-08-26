@@ -14,7 +14,7 @@ describe("length", () => {
 	});
 
 	it("should render 1 page", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -22,23 +22,23 @@ describe("length", () => {
 	});
 
 	it("should give the page a width of 140mm", async () => {
-		let width = await page.$eval(".pagedjs_page", (r) => {
-			return window.getComputedStyle(r).getPropertyValue("--pagedjs-width");
+		let width = await page.$eval(".paged_page", (r) => {
+			return window.getComputedStyle(r).getPropertyValue("--paged-width");
 		});
 
 		expect(width).toEqual("140mm");
 	});
 
 	it("should give the page a height of 200mm", async () => {
-		let width = await page.$eval(".pagedjs_page", (r) => {
-			return window.getComputedStyle(r).getPropertyValue("--pagedjs-height");
+		let width = await page.$eval(".paged_page", (r) => {
+			return window.getComputedStyle(r).getPropertyValue("--paged-height");
 		});
 
 		expect(width).toEqual("200mm");
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

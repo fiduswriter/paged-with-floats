@@ -14,7 +14,7 @@ describe("break-after-right", () => {
 	});
 
 	it("should render 39 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -23,7 +23,7 @@ describe("break-after-right", () => {
 
 	it("should render page 2 as blank", async () => {
 		let isBlank = await page.$eval("[data-page-number='2']", (r) => {
-			return r.classList.contains("pagedjs_blank_page");
+			return r.classList.contains("paged_blank_page");
 		});
 
 		expect(isBlank).toEqual(true);
@@ -31,7 +31,7 @@ describe("break-after-right", () => {
 
 	it("should render page 3 as right", async () => {
 		let isRight = await page.$eval("[data-page-number='3']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isRight).toEqual(true);
@@ -45,7 +45,7 @@ describe("break-after-right", () => {
 
 	it("should render page 5 as right", async () => {
 		let isRight = await page.$eval("[data-page-number='5']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isRight).toEqual(true);
@@ -59,7 +59,7 @@ describe("break-after-right", () => {
 
 	it("should render page 8 as blank", async () => {
 		let isBlank = await page.$eval("[data-page-number='8']", (r) => {
-			return r.classList.contains("pagedjs_blank_page");
+			return r.classList.contains("paged_blank_page");
 		});
 
 		expect(isBlank).toEqual(true);
@@ -67,7 +67,7 @@ describe("break-after-right", () => {
 
 	it("should render page 9 as right", async () => {
 		let isRight = await page.$eval("[data-page-number='9']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isRight).toEqual(true);
@@ -87,14 +87,14 @@ describe("break-after-right", () => {
 
 	it("should render page 11 as right", async () => {
 		let isRight = await page.$eval("[data-page-number='11']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isRight).toEqual(true);
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(2);

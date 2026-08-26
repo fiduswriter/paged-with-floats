@@ -15,12 +15,12 @@ describe("counter-pages", () => {
 
 	// Unable to read counter values
 	xit("should have page numbering", async () => {
-		let text = await page.$eval("[data-page-number='1'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text = await page.$eval("[data-page-number='1'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text).toContain("1 / 6");
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

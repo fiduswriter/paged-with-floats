@@ -14,7 +14,7 @@ describe("breaks", () => {
 	});
 
 	it("should render 5 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -23,11 +23,11 @@ describe("breaks", () => {
 
 	it("should avoid breaking after h2", async () => {
 		let h2ParentPage = await page.$eval("h2", (r) => {
-			let pageId = r.closest(".pagedjs_page").dataset.pageNumber;
+			let pageId = r.closest(".paged_page").dataset.pageNumber;
 			return pageId;
 		});
 		let pParentPage = await page.$eval("#afterh2", (r) => {
-			let pageId = r.closest(".pagedjs_page").dataset.pageNumber;
+			let pageId = r.closest(".paged_page").dataset.pageNumber;
 			return pageId;
 		});
 
@@ -40,7 +40,7 @@ describe("breaks", () => {
 			let section;
 			for (let i = 0; i < r.length; i++) {
 				section = r[i];
-				curr = section.closest(".pagedjs_page").dataset.pageNumber;
+				curr = section.closest(".paged_page").dataset.pageNumber;
 				if(curr === prev) {
 					return false;
 				}
@@ -56,7 +56,7 @@ describe("breaks", () => {
 	// inserted before break-before=right; the right-page placement itself
 	// is still verified by the following test.
 	it.skip("should render a blank page before break-before=right", async () => {
-		let blank = await page.$eval(".pagedjs_blank_page", (r) => {
+		let blank = await page.$eval(".paged_blank_page", (r) => {
 			return r.dataset.pageNumber;
 		});
 
@@ -65,7 +65,7 @@ describe("breaks", () => {
 
 	it("should render break-before=right sections as right page", async () => {
 		let isRight = await page.$eval("[data-page-number='5']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isRight).toEqual(true);
@@ -73,11 +73,11 @@ describe("breaks", () => {
 
 	it("should breaking after #breakAfter", async () => {
 		let h4ParentPage = await page.$eval("#breakAfter", (r) => {
-			let pageId = r.closest(".pagedjs_page").dataset.pageNumber;
+			let pageId = r.closest(".paged_page").dataset.pageNumber;
 			return pageId;
 		});
 		let pParentPage = await page.$eval("#afterh4", (r) => {
-			let pageId = r.closest(".pagedjs_page").dataset.pageNumber;
+			let pageId = r.closest(".paged_page").dataset.pageNumber;
 			return pageId;
 		});
 
@@ -85,7 +85,7 @@ describe("breaks", () => {
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

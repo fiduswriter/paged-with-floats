@@ -14,18 +14,18 @@ describe("page-floats-anchor-moves", () => {
 	});
 
 	it("should render 2 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toEqual(2);
 	});
 
 	it("should move the float together with its kept block", async () => {
-		let info = await page.$eval(".pagedjs_pages", (pagesArea) => {
+		let info = await page.$eval(".paged_pages", (pagesArea) => {
 			let pg1 = pagesArea.querySelector("[data-page-number='1']");
 			let pg2 = pagesArea.querySelector("[data-page-number='2']");
-			let moved = pg2.querySelector(".pagedjs_float_top #moved");
+			let moved = pg2.querySelector(".paged_float_top #moved");
 			return {
 				pg1Floats: pg1.querySelectorAll("[data-page-float]").length,
-				pg2Float: pg2.querySelector(".pagedjs_float_top").children.length,
+				pg2Float: pg2.querySelector(".paged_float_top").children.length,
 				inPg2: !!moved,
 				text1: pg1.textContent,
 				text2: pg2.textContent,

@@ -14,7 +14,7 @@ describe("text-align", () => {
 	});
 
 	it("Render the top-left-corner with a crimson background", async () => {
-		let pages = await page.$eval(".pagedjs_margin-top-left-corner", (r) => {
+		let pages = await page.$eval(".paged_margin-top-left-corner", (r) => {
 			return window.getComputedStyle(r)["background-color"];
 		});
 
@@ -22,7 +22,7 @@ describe("text-align", () => {
 	});
 
 	it("Render the left-top with a cornflowerblue border", async () => {
-		let pages = await page.$eval(".pagedjs_margin-left-top", (r) => {
+		let pages = await page.$eval(".paged_margin-left-top", (r) => {
 			return window.getComputedStyle(r)["border-color"];
 		});
 
@@ -31,7 +31,7 @@ describe("text-align", () => {
 
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

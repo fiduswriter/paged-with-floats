@@ -19,12 +19,12 @@ describe("page-nth", () => {
 	});
 
 	it("should have bottom center text", async () => {
-		let text = await page.$eval("[data-page-number='3'] .pagedjs_margin-bottom-center > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text = await page.$eval("[data-page-number='3'] .paged_margin-bottom-center > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text).toContain("3rd page of the document");
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(3);

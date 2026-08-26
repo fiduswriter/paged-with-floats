@@ -14,7 +14,7 @@ describe("duplicate-headers", () => {
 	});
 
 	it("should render 6 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -22,25 +22,25 @@ describe("duplicate-headers", () => {
 	});
 
 	it("page 1 header should be \"chapter\"", async () => {
-		let text = await page.$eval("[data-page-number='1'] .pagedjs_margin-top-left > .pagedjs_margin-content", (r) => r.textContent);
+		let text = await page.$eval("[data-page-number='1'] .paged_margin-top-left > .paged_margin-content", (r) => r.textContent);
 
 		expect(text).toContain("chapter");
 	});
 
 	it("page 3 header should be \"chapter nth\"", async () => {
-		let text = await page.$eval("[data-page-number='3'] .pagedjs_margin-top-left > .pagedjs_margin-content", (r) => r.textContent);
+		let text = await page.$eval("[data-page-number='3'] .paged_margin-top-left > .paged_margin-content", (r) => r.textContent);
 
 		expect(text).toContain("chapter nth");
 	});
 
 	it("page 4 header should be \"chapter left\"", async () => {
-		let text = await page.$eval("[data-page-number='4'] .pagedjs_margin-top-left > .pagedjs_margin-content", (r) => r.textContent);
+		let text = await page.$eval("[data-page-number='4'] .paged_margin-top-left > .paged_margin-content", (r) => r.textContent);
 
 		expect(text).toContain("chapter left");
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

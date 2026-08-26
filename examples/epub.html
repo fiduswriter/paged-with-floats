@@ -230,7 +230,7 @@
           });
 
           let resizer = () => {
-            let pages = document.querySelector(".pagedjs_pages");
+            let pages = document.querySelector(".paged_pages");
             scale = ((window.innerWidth ) / pages.offsetWidth) * .75;
             let style = document.createElement('style');
             style.setAttribute("media", "screen");
@@ -239,7 +239,7 @@
             if (scale < 1) {
               // pages.style.transform = `scale(${scale})`;
               // pages.style.marginLeft = `${(window.innerWidth / 2) - ((pages.offsetWidth/ 2) )  * scale }px`;
-              sheet.insertRule(`#viewer .pagedjs_pages { transform: scale(${scale}); margin-left: ${(window.innerWidth / 2) - ((pages.offsetWidth/ 2) )  * scale }px }`, sheet.cssRules.length);
+              sheet.insertRule(`#viewer .paged_pages { transform: scale(${scale}); margin-left: ${(window.innerWidth / 2) - ((pages.offsetWidth/ 2) )  * scale }px }`, sheet.cssRules.length);
             } else {
               pages.style.transform = "none";
               pages.style.marginLeft = "0";
@@ -260,7 +260,7 @@
               return;
             }
             pg = true;
-            let page = document.querySelector(".pagedjs_page");
+            let page = document.querySelector(".paged_page");
             let height = (page.offsetHeight + 51) * scale;
             var next = document.getElementById("next");
 
@@ -335,14 +335,14 @@
       margin-top: 40px;
     }
 
-    .pagedjs_page {
+    .paged_page {
       background-color: #fdfdfd;
       margin-bottom: calc(var(--margin) / 2);
       flex: none;
     }
 
-    .pagedjs_pages {
-      width: calc(var(--pagedjs-width) * 2);
+    .paged_pages {
+      width: calc(var(--paged-width) * 2);
       display: flex;
       flex-direction: row;
       flex-wrap: wrap;
@@ -351,15 +351,15 @@
       margin: 0 auto;
     }
 
-    .pagedjs_pages > .section {
-      width: calc(var(--pagedjs-width) * 2);
+    .paged_pages > .section {
+      width: calc(var(--paged-width) * 2);
       display: flex;
       flex-direction: row;
       flex-wrap: wrap;
       justify-content: flex-start;
     }
 
-    .pagedjs_first_page {
+    .paged_first_page {
       margin-left: 50%;
     }
 

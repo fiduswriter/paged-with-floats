@@ -15,7 +15,7 @@ describe("blank-page", () => {
 
 	it("should have an empty class on page 6", async () => {
 		let chapter = await page.$eval("[data-page-number='4']", (r) => {
-			return r.classList.contains("pagedjs_blank_page");
+			return r.classList.contains("paged_blank_page");
 		});
 
 		expect(chapter).toBe(true);
@@ -23,14 +23,14 @@ describe("blank-page", () => {
 
 	it("should not give page 1 an empty class", async () => {
 		let chapter = await page.$eval("[data-page-number='1']", (r) => {
-			return r.classList.contains("pagedjs_blank_page");
+			return r.classList.contains("paged_blank_page");
 		});
 
 		expect(chapter).toBe(false);
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

@@ -14,7 +14,7 @@ describe("break-after-verso", () => {
 	});
 
 	it("should render 38 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -23,7 +23,7 @@ describe("break-after-verso", () => {
 
 	it("should render page 4 as verso", async () => {
 		let isLeft = await page.$eval("[data-page-number='4']", (r) => {
-			return r.classList.contains("pagedjs_left_page");
+			return r.classList.contains("paged_left_page");
 		});
 
 		expect(isLeft).toEqual(true);
@@ -37,7 +37,7 @@ describe("break-after-verso", () => {
 
 	it("should render page 7 as blank", async () => {
 		let isBlank = await page.$eval("[data-page-number='7']", (r) => {
-			return r.classList.contains("pagedjs_blank_page");
+			return r.classList.contains("paged_blank_page");
 		});
 
 		expect(isBlank).toEqual(true);
@@ -45,7 +45,7 @@ describe("break-after-verso", () => {
 
 	it("should render page 8 as verso", async () => {
 		let isLeft = await page.$eval("[data-page-number='8']", (r) => {
-			return r.classList.contains("pagedjs_left_page");
+			return r.classList.contains("paged_left_page");
 		});
 
 		expect(isLeft).toEqual(true);
@@ -65,14 +65,14 @@ describe("break-after-verso", () => {
 
 	it("should render page 10 as verso", async () => {
 		let isLeft = await page.$eval("[data-page-number='10']", (r) => {
-			return r.classList.contains("pagedjs_left_page");
+			return r.classList.contains("paged_left_page");
 		});
 
 		expect(isLeft).toEqual(true);
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(4);

@@ -1,10 +1,15 @@
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
+import typescript from "@rollup/plugin-typescript";
 import serve from "rollup-plugin-serve";
 import livereload from "rollup-plugin-livereload";
 
 const plugins = [
+	typescript({
+		tsconfig: "./tsconfig.rollup.json",
+		exclude: ["src/**/*.test.ts"],
+	}),
 	nodeResolve({
 		extensions: [".cjs", ".mjs", ".js"],
 	}),
@@ -27,7 +32,7 @@ const plugins = [
 
 export default [
 	{
-		input: "./src/polyfill/polyfill.js",
+		input: "./src/polyfill/polyfill.ts",
 		output: {
 			sourcemap: true,
 			name: "PagedPolyfill",

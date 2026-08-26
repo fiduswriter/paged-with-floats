@@ -15,7 +15,7 @@ describe("page-spread", () => {
 
 	it("should render page 2 as left", async () => {
 		let isLeft = await page.$eval("[data-page-number='2']", (r) => {
-			return r.classList.contains("pagedjs_left_page");
+			return r.classList.contains("paged_left_page");
 		});
 
 		expect(isLeft).toEqual(true);
@@ -23,14 +23,14 @@ describe("page-spread", () => {
 
 	it("should render page 3 as right", async () => {
 		let isRight = await page.$eval("[data-page-number='3']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isRight).toEqual(true);
 	});
 
 	it("should have bottom center text of right on the first page", async () => {
-		let text = await page.$eval("[data-page-number='1'] .pagedjs_margin-bottom-center > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text = await page.$eval("[data-page-number='1'] .paged_margin-bottom-center > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text).toContain("right");
 	});
 
@@ -40,7 +40,7 @@ describe("page-spread", () => {
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(3);

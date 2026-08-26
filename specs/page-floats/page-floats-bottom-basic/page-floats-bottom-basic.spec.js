@@ -14,23 +14,23 @@ describe("page-floats-bottom-basic", () => {
 	});
 
 	it("should render 1 page", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toEqual(1);
 	});
 
 	it("should pin the figure to the bottom of the page content", async () => {
 		let info = await page.$eval("[data-page-number='1']", (pg) => {
-			let content = pg.querySelector(".pagedjs_page_content");
-			let bottom = content.querySelector(".pagedjs_float_bottom");
+			let content = pg.querySelector(".paged_page_content");
+			let bottom = content.querySelector(".paged_float_bottom");
 			let fig = bottom.querySelector("#float-b");
 			let contentRect = content.getBoundingClientRect();
 			let figRect = fig ? fig.getBoundingClientRect() : null;
 			let betaRect = document.getElementById("beta").getBoundingClientRect();
 			let wrapper = content.querySelector(
-				":scope > div:not(.pagedjs_float_top):not(.pagedjs_float_bottom)"
+				":scope > div:not(.paged_float_top):not(.paged_float_bottom)"
 			);
 			let spacer = wrapper
-				? wrapper.querySelector(":scope > .pagedjs_float_spacer")
+				? wrapper.querySelector(":scope > .paged_float_spacer")
 				: null;
 			return {
 				inContainer: !!fig,
@@ -52,11 +52,11 @@ describe("page-floats-bottom-basic", () => {
 
 	it("should keep the flow above the reserved space", async () => {
 		let overlap = await page.$eval("[data-page-number='1']", (pg) => {
-			let content = pg.querySelector(".pagedjs_page_content");
-			let fig = content.querySelector(".pagedjs_float_bottom #float-b");
+			let content = pg.querySelector(".paged_page_content");
+			let fig = content.querySelector(".paged_float_bottom #float-b");
 			let figTop = fig.getBoundingClientRect().top;
 			let wrapper = content.querySelector(
-				":scope > div:not(.pagedjs_float_top):not(.pagedjs_float_bottom)"
+				":scope > div:not(.paged_float_top):not(.paged_float_bottom)"
 			);
 			let range = document.createRange();
 			range.selectNodeContents(wrapper);

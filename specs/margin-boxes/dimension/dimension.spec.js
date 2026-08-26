@@ -15,7 +15,7 @@ describe("margin-box-dimension", () => {
 
 
 	if (!DEBUG) {
-		xit("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

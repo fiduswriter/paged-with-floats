@@ -8,8 +8,16 @@
         "es2022": true
     },
     "globals": {
+        "it_snapshots": "readonly"
     },
-    "extends": "eslint:recommended",
+    "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+        "@typescript-eslint"
+    ],
     "parserOptions": {
         "sourceType": "module",
         "ecmaVersion": 2022
@@ -19,8 +27,12 @@
             "error",
             "tab",
             {
-              "VariableDeclarator": { "var": 2, "let": 2, "const": 3 },
-              "SwitchCase" : 1
+                "VariableDeclarator": {
+                    "var": 2,
+                    "let": 2,
+                    "const": 3
+                },
+                "SwitchCase": 1
             }
         ],
         "linebreak-style": [
@@ -35,12 +47,51 @@
             "error",
             "always"
         ],
-        "no-console" : ["error", { "allow": ["warn", "error"] }],
-        "no-unused-vars": [
-          "error",
-          { "vars": "all", "args": "none" }
+        "no-console": [
+            "error",
+            {
+                "allow": [
+                    "warn",
+                    "error"
+                ]
+            }
         ],
-        "no-mixed-spaces-and-tabs": ["error", "smart-tabs"],
-        "valid-jsdoc": ["warn"]
-    }
+        "no-unused-vars": "off",
+        "@typescript-eslint/no-unused-vars": [
+            "error",
+            {
+                "vars": "all",
+                "args": "none"
+            }
+        ],
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-empty-interface": "off",
+        "@typescript-eslint/no-unsafe-function-type": "off",
+        "@typescript-eslint/no-unsafe-declaration-merging": "off",
+        "@typescript-eslint/no-empty-object-type": "off",
+        "@typescript-eslint/prefer-const": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "prefer-const": "off",
+        "no-var": "off",
+        "prefer-rest-params": "off",
+        "no-unused-expressions": "off",
+        "@typescript-eslint/no-unused-expressions": "off",
+        "no-mixed-spaces-and-tabs": [
+            "error",
+            "smart-tabs"
+        ],
+        "valid-jsdoc": [
+            "warn"
+        ]
+    },
+    "overrides": [
+        {
+            "files": [
+                "*.ts"
+            ],
+            "rules": {
+                "indent": "off"
+            }
+        }
+    ]
 }

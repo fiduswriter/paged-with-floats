@@ -14,7 +14,7 @@ describe("break-before-left", () => {
 	});
 
 	it("should render 36 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -23,7 +23,7 @@ describe("break-before-left", () => {
 
 	// it('should render page 1 as blank', async () => {
 	// 	let isBlank = await page.$eval("[data-page-number='1']", (r) => {
-	// 		return r.classList.contains("pagedjs_blank_page");
+	// 		return r.classList.contains("paged_blank_page");
 	// 	});
 	//
 	// 	expect(isBlank).toEqual(true);
@@ -31,7 +31,7 @@ describe("break-before-left", () => {
 
 	it("should render page 1 as right", async () => {
 		let isLeft = await page.$eval("[data-page-number='1']", (r) => {
-			return r.classList.contains("pagedjs_right_page");
+			return r.classList.contains("paged_right_page");
 		});
 
 		expect(isLeft).toEqual(true);
@@ -51,7 +51,7 @@ describe("break-before-left", () => {
 
 	it("should render page 7 as blank", async () => {
 		let isBlank = await page.$eval("[data-page-number='7']", (r) => {
-			return r.classList.contains("pagedjs_blank_page");
+			return r.classList.contains("paged_blank_page");
 		});
 
 		expect(isBlank).toEqual(true);
@@ -65,7 +65,7 @@ describe("break-before-left", () => {
 
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

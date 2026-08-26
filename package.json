@@ -1,6 +1,6 @@
 {
   "name": "paged-with-floats",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Fork of Paged.js: chunks up a document into paged media flows, applies print styles, and adds support for CSS page floats",
   "author": "Johannes Wilm",
   "maintainers": [
@@ -37,11 +37,11 @@
     "Patrick Kranz",
     "Rob Mayer",
     "Sam Ruby",
-    "Stéphane Elbaron",
+    "St\u00e9phane Elbaron",
     "Talbi Youssef",
     "Urban Suppiger",
     "Yann Trividic",
-    "Antoine Fauchié",
+    "Antoine Fauchi\u00e9",
     "mb21",
     "wangfengming",
     "wenbei421"
@@ -57,25 +57,39 @@
     "css",
     "print",
     "page-floats",
+    "multi-column",
+    "multicol",
+    "typescript",
     "pdf",
     "browser"
   ],
-  "main": "src/index.js",
-  "browser": "dist/paged.js",
+  "main": "./lib/index.cjs",
+  "module": "./dist/paged.esm.js",
+  "browser": "./dist/paged.js",
+  "types": "./types/index.d.ts",
   "type": "module",
   "exports": {
-    "import": "./src/index.js",
+    "types": "./types/index.d.ts",
+    "import": "./dist/paged.esm.js",
     "require": "./lib/index.cjs",
     "browser": "./dist/paged.js",
     "polyfill": "./dist/paged.polyfill.js",
-    "default": "./src/index.js"
+    "./pdf": {
+      "types": "./types/paged.pdf.d.ts",
+      "default": "./dist/paged.pdf.js"
+    },
+    "default": "./dist/paged.esm.js"
   },
   "dependencies": {
     "@babel/polyfill": "^7.10.1",
     "@babel/runtime": "^7.21.0",
+    "@chenglou/pretext": "^0.0.8",
+    "@pdfme/pdf-lib": "^6.1.12",
     "clear-cut": "^2.0.2",
     "css-tree": "^1.1.3",
-    "event-emitter": "^0.3.5"
+    "event-emitter": "^0.3.5",
+    "fontkit": "^2.0.4",
+    "svg4pdf-lib": "^0.1.2"
   },
   "devDependencies": {
     "@babel/cli": "^7.21.0",
@@ -83,10 +97,14 @@
     "@babel/plugin-proposal-async-generator-functions": "^7.20.7",
     "@babel/plugin-transform-runtime": "^7.21.4",
     "@babel/preset-env": "^7.21.4",
+    "@babel/preset-typescript": "^7.28.5",
     "@rollup/plugin-commonjs": "^24.1.0",
     "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
     "@rollup/plugin-terser": "^0.4.1",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
     "babel-plugin-replace-import-extension": "^1.1.3",
     "chalk": "^5.2.0",
     "eslint": "^8.38.0",
@@ -100,22 +118,24 @@
     "rollup-plugin-license": "^3.0.1",
     "rollup-plugin-livereload": "^2.0.5",
     "rollup-plugin-node-builtins": "^2.1.2",
-    "rollup-plugin-serve": "^2.0.2"
+    "rollup-plugin-serve": "^2.0.2",
+    "typescript": "^5.9.3"
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "rollup -c && node scripts/copy-pdf-fonts.mjs",
     "start": "rollup -w -c rollup.server.config.js",
-    "test": "npm run lint && jest",
+    "test": "npm run lint && tsc --noEmit && jest",
     "specs": "npm run pretest && jest --config=specs/jest.config.js",
     "compile": "babel src/ -d lib/ --out-file-extension .cjs",
     "legacy": "babel dist/paged.js --out-file dist/paged.legacy.js && babel dist/paged.polyfill.js --out-file dist/paged.polyfill.legacy.js",
     "pretest": "npm run build && npm run compile",
-    "prepublishOnly": "npm run build && npm run compile && npm run legacy",
+    "prepublishOnly": "npm run build && npm run compile && npm run legacy && npm run types",
+    "types": "tsc -p tsconfig.types.json",
     "watch": "rollup -w -c",
     "lint": "eslint -c .eslintrc.json src specs",
     "specs-dom": "jest --config=specs/jest.config.js page-floats data64 filters/undisplayed filters/script-elements splits/tables/long-table whitespaces/whitespaces.spec.js",
-    "docker-specs": "docker build -t paged-with-floats . && docker run --rm --ipc=host -v $(pwd)/specs:/home/pwuser/pagedjs/specs paged-with-floats npm run specs",
-    "docker-update-specs": "docker build -t paged-with-floats . && docker run --rm --ipc=host -v $(pwd)/specs:/home/pwuser/pagedjs/specs paged-with-floats npm run specs -- -u"
+    "docker-specs": "docker build -t paged-with-floats . && docker run --rm --ipc=host -v $(pwd)/specs:/home/pwuser/paged-with-floats/specs paged-with-floats npm run specs",
+    "docker-update-specs": "docker build -t paged-with-floats . && docker run --rm --ipc=host -v $(pwd)/specs:/home/pwuser/paged-with-floats/specs paged-with-floats npm run specs -- -u"
   },
   "repository": {
     "type": "git",
@@ -125,8 +145,12 @@
     "dist",
     "lib",
     "src",
+    "types",
     "LICENSE.md",
     "COPYING",
     "COPYING.LESSER"
-  ]
+  ],
+  "optionalDependencies": {
+    "fonteditor-core": "^2.6.3"
+  }
 }

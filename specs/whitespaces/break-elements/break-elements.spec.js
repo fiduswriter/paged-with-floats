@@ -14,7 +14,7 @@ describe("break-elements", () => {
 	});
 
 	it("should render 2 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -39,7 +39,7 @@ describe("break-elements", () => {
 	// comparison above pins the actual rendering.
 	it.skip("should include point 9 on page 1", async () => {
 		let point9 = await page.$eval("table tr:nth-child(10) td:nth-child(1)", (r) => {
-			let pageId = r.closest(".pagedjs_page").dataset.pageNumber;
+			let pageId = r.closest(".paged_page").dataset.pageNumber;
 			return pageId;
 		});
 
@@ -47,7 +47,7 @@ describe("break-elements", () => {
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

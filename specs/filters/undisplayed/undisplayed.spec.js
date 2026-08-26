@@ -15,7 +15,7 @@ describe("undisplayed", () => {
 	});
 
 	it("should not break display: none elements to new page", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toBe(2);
 
 		let el = await page.$("#displayNoneStyle");

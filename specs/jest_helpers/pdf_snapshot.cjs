@@ -13,6 +13,15 @@ try {
 	// not installed
 }
 
+/**
+ * Whether PDF snapshot comparisons can run in this environment. When
+ * false, suites declare their snapshot tests via the global
+ * `it_snapshots` helper (installed by setup_tests.cjs), which skips
+ * instead of failing.
+ */
+const PDF_SNAPSHOTS_AVAILABLE = !!gs;
+module.exports.PDF_SNAPSHOTS_AVAILABLE = PDF_SNAPSHOTS_AVAILABLE;
+
 function UUID() {
 	var d = new Date().getTime();
 	if (typeof performance !== "undefined" && typeof performance.now === "function"){

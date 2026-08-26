@@ -27,7 +27,7 @@
     <script src="../dist/paged.js"></script>
 
     <style media="screen">
-      #main .pagedjs_first_page {
+      #main .paged_first_page {
         margin-left: unset;
       }
     </style>
@@ -90,7 +90,7 @@
 
 
       let resizer = () => {
-        let pages = document.querySelector(".pagedjs_pages");
+        let pages = document.querySelector(".paged_pages");
         let scale = ((window.innerWidth * .9 ) / pages.offsetWidth);
 				if (scale < 1) {
 					pages.style.transform = `scale(${scale}) translate(${(window.innerWidth / 2) - ((pages.offsetWidth * scale / 2) ) }px, 0)`;

@@ -14,12 +14,12 @@ describe("page-floats-bare-syntax", () => {
 	});
 
 	it("should activate page floats from bare float syntax", async () => {
-		let info = await page.$eval(".pagedjs_pages", (pagesArea) => {
+		let info = await page.$eval(".paged_pages", (pagesArea) => {
 			let pg1 = pagesArea.querySelector("[data-page-number='1']");
 			let pg2 = pagesArea.querySelector("[data-page-number='2']");
-			let fig = pg1.querySelector(".pagedjs_float_top #float-a");
+			let fig = pg1.querySelector(".paged_float_top #float-a");
 			return {
-				pages: pagesArea.querySelectorAll(".pagedjs_page").length,
+				pages: pagesArea.querySelectorAll(".paged_page").length,
 				hasFig: !!fig,
 				text1: pg1.textContent,
 				text2: pg2.textContent,

@@ -14,7 +14,7 @@ describe("issue-191-tds-missing", () => {
 	});
 
 	xit("should render 4 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 

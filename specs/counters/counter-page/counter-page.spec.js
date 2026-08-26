@@ -15,27 +15,27 @@ describe("counter-page", () => {
 
 	// Unable to read counter values
 	xit("should have a page number for all pages", async () => {
-		let text1 = await page.$eval("[data-page-number='1'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text1 = await page.$eval("[data-page-number='1'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text1).toContain("1");
 
-		let text2 = await page.$eval("[data-page-number='2'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text2 = await page.$eval("[data-page-number='2'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text2).toContain("2");
 
-		let text3 = await page.$eval("[data-page-number='3'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text3 = await page.$eval("[data-page-number='3'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text3).toContain("3");
 
-		let text4 = await page.$eval("[data-page-number='4'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text4 = await page.$eval("[data-page-number='4'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text4).toContain("4");
 
-		let text5 = await page.$eval("[data-page-number='5'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text5 = await page.$eval("[data-page-number='5'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text5).toContain("5");
 
-		let text6 = await page.$eval("[data-page-number='6'] .pagedjs_margin-bottom-left > .pagedjs_margin-content", (r) => window.getComputedStyle(r, "::after").content);
+		let text6 = await page.$eval("[data-page-number='6'] .paged_margin-bottom-left > .paged_margin-content", (r) => window.getComputedStyle(r, "::after").content);
 		expect(text6).toContain("6");
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

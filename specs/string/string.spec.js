@@ -14,14 +14,14 @@ describe("default", () => {
 	});
 
 	it("should set the running header as \"a '' this \" ' aa\" on the first page", async () => {
-		let text = await page.$eval(".pagedjs_first_page", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-alphabet"));
+		let text = await page.$eval(".paged_first_page", (r) =>
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-alphabet"));
 		expect(text).toEqual("\"aaa\"");
 	});
 
 	it("should set the running header as \"fff\" on the second page", async () => {
 		let text = await page.$eval("#page-2", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-alphabet"));
 		expect(text).toEqual("\"fff\"");
 	});
 });
@@ -40,14 +40,14 @@ describe("first", () => {
 	});
 
 	it("should set the running header as \"aaa\" on the first page", async () => {
-		let text = await page.$eval(".pagedjs_first_page", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-alphabet"));
+		let text = await page.$eval(".paged_first_page", (r) =>
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-alphabet"));
 		expect(text).toEqual("\"aaa\"");
 	});
 
 	it("should set the running header as \"fff\" on the second page", async () => {
 		let text = await page.$eval("#page-2", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-alphabet"));
 		expect(text).toEqual("\"fff\"");
 	});
 });
@@ -66,14 +66,14 @@ describe("last", () => {
 	});
 
 	it("should set the running header as \"fff\" on the first page", async () => {
-		let text = await page.$eval(".pagedjs_first_page", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-last-alphabet"));
+		let text = await page.$eval(".paged_first_page", (r) =>
+			window.getComputedStyle(r).getPropertyValue("--paged-string-last-alphabet"));
 		expect(text).toEqual("\"fff\"");
 	});
 
 	it("should set the running header as \"fff\" on the second page", async () => {
 		let text = await page.$eval("#page-2", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-last-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-last-alphabet"));
 		expect(text).toEqual("\"fff\"");
 	});
 });
@@ -92,14 +92,14 @@ describe("first-except", () => {
 	});
 
 	it("should set the running header as nothing on the first page", async () => {
-		let text = await page.$eval(".pagedjs_first_page", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-except-alphabet"));
+		let text = await page.$eval(".paged_first_page", (r) =>
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-except-alphabet"));
 		expect(text).toEqual("\"\"");
 	});
 
 	it("should set the running header as \"aaa\" on the second page", async () => {
 		let text = await page.$eval("#page-2", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-except-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-except-alphabet"));
 		expect(text).toEqual("\"aaa\"");
 	});
 });
@@ -120,19 +120,19 @@ describe("string-start", () => {
 	// The start value is empty, as the string had not yet been set at the start of the page.
 	// See https://www.w3.org/TR/css-gcpm-3/#string-start
 	it("should set the running header as nothing on the first page", async () => {
-		let text = await page.$eval(".pagedjs_first_page", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-start-alphabet"));
+		let text = await page.$eval(".paged_first_page", (r) =>
+			window.getComputedStyle(r).getPropertyValue("--paged-string-start-alphabet"));
 		expect(text).toEqual("\"\"");
 	});
 
 	it("should set the running header as \"fff\" on the third page", async () => {
 		let text = await page.$eval("#page-3", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-start-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-start-alphabet"));
 		expect(text).toEqual("\"fff\"");
 	});
 	it("should set the running header as \"ggg\" on page 4", async () => {
 		let text = await page.$eval("#page-4", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-start-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-start-alphabet"));
 		expect(text).toEqual("\"ggg\"");
 	});
 });
@@ -152,22 +152,22 @@ describe("string-multiple", () => {
 
 	it("should set the running header as \"aaa\" on the second page", async () => {
 		let text = await page.$eval("#page-2", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-except-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-except-alphabet"));
 		expect(text).toEqual("\"aaa\"");
 	});
 	it("should set the running header as \"1111\" on the second page", async () => {
 		let text = await page.$eval("#page-2", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-except-alphabetbis"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-except-alphabetbis"));
 		expect(text).toEqual("\"1111\"");
 	});
 	it("should set the running header as \"fff\" on the third page", async () => {
 		let text = await page.$eval("#page-9", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-except-alphabet"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-except-alphabet"));
 		expect(text).toEqual("\"bbb\"");
 	});
 	it("should set the running header as \"fff\" on the third page", async () => {
 		let text = await page.$eval("#page-9", (r) =>
-			window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-except-alphabetbis"));
+			window.getComputedStyle(r).getPropertyValue("--paged-string-first-except-alphabetbis"));
 		expect(text).toEqual("\"2222\"");
 	});
 
@@ -185,14 +185,14 @@ describe("string-multiple", () => {
 		});
 	
 		it("should set the running header as \"a '' this \" 'Chpater A\" on the first page", async () => {
-			let text = await page.$eval(".pagedjs_first_page", (r) =>
-				window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-alphabet"));
+			let text = await page.$eval(".paged_first_page", (r) =>
+				window.getComputedStyle(r).getPropertyValue("--paged-string-first-alphabet"));
 			expect(text).toEqual("\"Chapter A\"");
 		});
 	
 		it("should set the running header as \"Chapter F\" on the second page", async () => {
 			let text = await page.$eval("#page-2", (r) =>
-				window.getComputedStyle(r).getPropertyValue("--pagedjs-string-first-alphabet"));
+				window.getComputedStyle(r).getPropertyValue("--paged-string-first-alphabet"));
 			expect(text).toEqual("\"Chapter F\"");
 		});
 	});

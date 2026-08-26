@@ -19,7 +19,7 @@ describe("counter-increment-negative-page", () => {
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			const pdf = await page.pdf(PDF_SETTINGS);
 			expect(pdf).toMatchPDFSnapshot(1);
 			expect(pdf).toMatchPDFSnapshot(2);

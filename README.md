@@ -32,6 +32,150 @@ enough room left on the page, the float defers to the next page while
 following content continues to fill the current one, as specified by the CSS
 Page Floats module.
 
+## Multi-column layout
+
+CSS multi-column content is paginated. Both root-level flows and mid-document
+blocks work:
+
+```css
+body {
+	column-count: 2; /* whole document flows through two columns per page */
+}
+
+section {
+	columns: 3; /* blocks may appear anywhere in a single-column flow */
+}
+```
+
+Content fills column by column, continues onto further columns, then breaks
+to the next page, where any partially-filled multicol block continues with
+fresh columns. `column-gap`, `column-rule-*` and `column-span: all` are
+honored (spanning works natively once the container is a real multicol
+context). `column-fill: balance` is ignored on containers that fragment
+across pages — they fill `auto`, except for an unfragmented final portion,
+which balances naturally.
+
+Not supported: nested multicol containers (a fragmentainer inside another is
+degraded to one column with a console warning) and RTL column order.
+
+`column-fill: balance` is honored on final pages: while a multicol block
+spans pages it fills `auto` into the remaining space; once rendering
+completes the last fragment's height constraint is released so its columns
+balance — verified not to re-introduce overflow before the release sticks.
+
+## Text measurement
+
+Three text-breaking backends are available via settings:
+
+```js
+window.PagedConfig = {
+	settings: {
+		textMeasurement: "dom", // default: legacy DOM walker (fastest)
+		// textMeasurement: "pretext", // predicted breaking, verified
+		verifyTextPrediction: false,  // pretext only: skip per-break probes
+	},
+};
+```
+
+- **`dom`** (default): the classic walker; measures words through DOM rects.
+  Fastest in benchmarks across a five-book Project Gutenberg corpus.
+- **`pretext`**: predicts break offsets arithmetically from cached canvas
+  measurements ([pretext](https://github.com/chenglou/pretext)); the whole
+  document's texts are prepared once after fonts load and continuations
+  reuse those objects. Each prediction is verified against real DOM rects,
+  falling back to the `dom` walker when inconsistent. Produces identical
+  page output to `dom` on the full corpus at a small speed cost today; the
+  architecture is the basis for upcoming features (column balancing,
+  hyphenation search).
+- **`pretext` + `verifyTextPrediction: false`**: accepts arithmetic breaks
+  without probes. Post-render auditing guards quality: after `preview()`,
+  `flow.overflowViolations` lists pages whose content ended up outside its
+  designated space (`validateRenderedPages(pagesArea)` audits any output).
+
+See `examples/measurement-benchmark.html` to compare modes on the same
+document, `specs/fixtures/gutenberg/` for realistic corpora (public-domain
+books; not part of the npm package), and `window.__pagedDomOps` /
+`window.__pagedPredictStats` for read/prediction counters when debugging
+(`settings.debugDomOps` enables the former).
+
+Pagination work is coalesced into time-boxed animation frames
+(`settings.renderFrameBudget`, default 12 ms) — raising it paginates faster
+at the cost of UI responsiveness during rendering.
+
+## Demos
+
+GitHub Pages hosts live demos (built by
+`.github/workflows/pages.yml` on every push to `main`; enable Pages with
+the “GitHub Actions” source once in the repository settings):
+
+- **The Malay Archipelago** (`examples/multicol-floats.html`) — editable
+  playground: modify the HTML source in a textarea, re-render the pages
+  on screen, or download a dynamically generated vector PDF.
+- **Alice in Wonderland / Frankenstein / Moby-Dick**
+  (`examples/books/*.html`) — complete public-domain books paginated on
+  screen in two, three and four columns respectively, each with a
+  one-click PDF download.
+
+To preview locally: `npm run build`, then serve the repository root
+(`npx serve .`) and open `examples/index.html`.
+
+## Print & PDF export
+
+Two Vivliostyle-compatible APIs ship as a separate bundle
+(`dist/paged.pdf.js`, `import ... from "paged-with-floats/pdf"`):
+
+```ts
+import {
+	printHTML,
+	emitPdfFromPagedjsWindow,
+	htmlToPDF,
+} from "paged-with-floats/pdf";
+
+// 1. vivliostyle-print-compatible: paginate html in a hidden iframe.
+printHTML(htmlDoc, {
+	title: "my printed page",
+	keepIframe: true, // needed when an async consumer uses the window
+	printCallback: (iframeWin) => iframeWin.print(), // optional
+	errorCallback: (message) => alert(message),      // optional
+});
+
+// 2. emitPdfFromPagedjsWindow does the same job as vivliostyle-pdf's
+//    `emitPdfFromVivliostyleWindow`, but for paged-with-floats-paginated windows:
+//    real vector PDF with embedded/subsetted fonts, link annotations,
+//    outline and metadata. Composed exactly like the vivliostyle pair:
+printHTML(htmlDoc, {
+	title: "My document",
+	keepIframe: true,
+	printCallback: (win) => {
+		emitPdfFromPagedjsWindow(win, console.log, {
+			sourceHtml: htmlDoc,
+			metadata: { title: "My document" },
+		}).then((bytes) => download(new Blob([bytes])));
+	},
+});
+
+// 3. or both steps in one call:
+const bytes = await htmlToPDF(htmlDoc, {
+	title: "My document",
+});
+download(new Blob([bytes], { type: "application/pdf" }));
+```
+
+The emitter is derived from
+[vivliostyle-pdf](https://github.com/fiduswriter/vivliostyle-pdf)
+(LGPL-3.0-or-later, same author). Fallback fonts for documents without
+`@font-face` rules are copied from a local vivliostyle-pdf checkout into
+`dist/fonts/` at build time when available; exports proceed without them
+otherwise. Remote images require CORS-safe URLs. See
+`examples/multicol-floats.html` for a print-ready demo combining multicol,
+page floats and footnotes.
+
+## TypeScript
+
+The library is written in strict TypeScript and ships type declarations;
+`import { Previewer } from "paged-with-floats"` is fully typed, including
+the handler/hook APIs used for extensions.
+
 ## How this library compares to Vivliostyle
 
 [Vivliostyle](https://vivliostyle.org/) is the most complete open-source CSS
@@ -59,9 +203,10 @@ reference documents the full picture; the most significant gaps here are:
   `right`, corner combinations, `snap-block`), `float-reference: column` and
   `region`, the extended `clear` values, `float-min-wrap-block`, and real text
   wrapping around floats.
-- **Multi-column layout** — Vivliostyle implements root multi-column pages
-  with column fragmentation; this library does not paginate multi-column
-  content within a page.
+- **Multi-column layout** — this library paginates root-level and mid-flow
+  multicol content (`column-count`/`columns`/`column-span: all`). Vivliostyle
+  additionally covers balancing across fragmented pages, column-relative page
+  floats and RTL column order.
 - **Writing modes** — vertical writing and RTL layouts (CSS Writing Modes 3)
   are supported by Vivliostyle; this library assumes horizontal top-to-bottom
   writing.
@@ -284,7 +429,9 @@ npm run specs-dom
 compare pages (one at a time) against stored baseline images. Pixel
 comparisons only stay meaningful when Chromium, fonts, freetype and
 Ghostscript are pinned, so these are best run inside the Docker container
-(see below), which provides that environment:
+(see below), which provides that environment. Where Ghostscript is not
+available these tests skip automatically instead of failing — locally,
+`npm run specs` reports them as skipped and everything else runs green.
 
 ```bash
 npm run docker-specs
@@ -295,6 +442,10 @@ To regenerate the baselines after an intentional rendering change:
 ```bash
 npm run docker-update-specs
 ```
+
+The image uses only free fonts: fixtures referencing Times New Roman /
+Arial / Courier New resolve to the metric-compatible Liberation families
+via fontconfig aliases — no Microsoft fonts are installed.
 
 If you prefer to run the PDF comparison suite outside Docker, you need a
 local Ghostscript for your system according to https://www.npmjs.com/package/ghostscript4js#prerequisites

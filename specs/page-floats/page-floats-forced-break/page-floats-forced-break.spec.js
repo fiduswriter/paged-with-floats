@@ -14,20 +14,20 @@ describe("page-floats-forced-break", () => {
 	});
 
 	it("should render 2 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toEqual(2);
 	});
 
 	it("should keep the float on the anchor page", async () => {
-		let info = await page.$eval(".pagedjs_pages", (pagesArea) => {
+		let info = await page.$eval(".paged_pages", (pagesArea) => {
 			let pg1 = pagesArea.querySelector("[data-page-number='1']");
 			let pg2 = pagesArea.querySelector("[data-page-number='2']");
 			return {
-				fbOnPage1: !!pg1.querySelector(".pagedjs_float_top #fb"),
+				fbOnPage1: !!pg1.querySelector(".paged_float_top #fb"),
 				totalFb: pagesArea.querySelectorAll("#fb").length,
 				page1Text: pg1.textContent,
 				page2Text: pg2.textContent,
-				pg2TopEmpty: pg2.querySelector(".pagedjs_float_top").children
+				pg2TopEmpty: pg2.querySelector(".paged_float_top").children
 					.length,
 				h1OnPage2: !!pg2.querySelector("h1"),
 			};

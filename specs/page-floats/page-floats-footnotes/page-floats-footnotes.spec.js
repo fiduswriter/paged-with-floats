@@ -14,14 +14,14 @@ describe("page-floats-footnotes", () => {
 	});
 
 	it("should render 1 page", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => r.length);
+		let pages = await page.$$eval(".paged_page", (r) => r.length);
 		expect(pages).toEqual(1);
 	});
 
 	it("should place the float and the footnote on the same page", async () => {
 		let info = await page.$eval("[data-page-number='1']", (pg) => {
-			let fig = pg.querySelector(".pagedjs_float_top #pf-one");
-			let noteContent = pg.querySelector(".pagedjs_footnote_content");
+			let fig = pg.querySelector(".paged_float_top #pf-one");
+			let noteContent = pg.querySelector(".paged_footnote_content");
 			return {
 				hasFig: !!fig,
 				noteText: noteContent ? noteContent.textContent : "",

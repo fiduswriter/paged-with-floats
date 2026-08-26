@@ -14,7 +14,7 @@ describe("vertical-align", () => {
 	});
 
 	it("Render the top-left at the top", async () => {
-		let pages = await page.$eval(".pagedjs_margin-top-left", (r) => {
+		let pages = await page.$eval(".paged_margin-top-left", (r) => {
 			return window.getComputedStyle(r)["align-items"];
 		});
 
@@ -23,7 +23,7 @@ describe("vertical-align", () => {
 
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

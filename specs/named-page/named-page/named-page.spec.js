@@ -14,7 +14,7 @@ describe("named-page", () => {
 	});
 
 	it("should render 8 pages", async () => {
-		let pages = await page.$$eval(".pagedjs_page", (r) => {
+		let pages = await page.$$eval(".paged_page", (r) => {
 			return r.length;
 		});
 
@@ -23,7 +23,7 @@ describe("named-page", () => {
 
 	it("should not give page 1 a named class", async () => {
 		let chapter = await page.$eval("[data-page-number='1']", (r) => {
-			return r.classList.contains("pagedjs_chapter_page");
+			return r.classList.contains("paged_chapter_page");
 		});
 
 		expect(chapter).toBe(false);
@@ -31,7 +31,7 @@ describe("named-page", () => {
 
 	it("should give the page 3 a named class", async () => {
 		let chapter = await page.$eval("[data-page-number='3']", (r) => {
-			return r.classList.contains("pagedjs_chapter_page");
+			return r.classList.contains("paged_chapter_page");
 		});
 
 		expect(chapter).toBe(true);
@@ -39,7 +39,7 @@ describe("named-page", () => {
 
 	it("should give the page 4 a named class", async () => {
 		let chapter = await page.$eval("[data-page-number='4']", (r) => {
-			return r.classList.contains("pagedjs_chapter_page");
+			return r.classList.contains("paged_chapter_page");
 		});
 
 		expect(chapter).toBe(true);
@@ -47,7 +47,7 @@ describe("named-page", () => {
 
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);

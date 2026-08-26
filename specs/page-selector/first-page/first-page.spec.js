@@ -15,7 +15,7 @@ describe("first-page", () => {
 
 	it("should have a first page class on page 1", async () => {
 		let chapter = await page.$eval("[data-page-number='1']", (r) => {
-			return r.classList.contains("pagedjs_first_page");
+			return r.classList.contains("paged_first_page");
 		});
 
 		expect(chapter).toBe(true);
@@ -23,14 +23,14 @@ describe("first-page", () => {
 
 	it("should not give page 2 a first page class", async () => {
 		let chapter = await page.$eval("[data-page-number='2']", (r) => {
-			return r.classList.contains("pagedjs_first_page");
+			return r.classList.contains("paged_first_page");
 		});
 
 		expect(chapter).toBe(false);
 	});
 
 	if (!DEBUG) {
-		it("should create a pdf", async () => {
+		it_snapshots("should create a pdf", async () => {
 			let pdf = await page.pdf(PDF_SETTINGS);
 
 			expect(pdf).toMatchPDFSnapshot(1);
