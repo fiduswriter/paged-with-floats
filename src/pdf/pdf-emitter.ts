@@ -247,6 +247,9 @@ interface WordRun {
     decoration: TextDecoration
     /** synthesize small caps: lowercase drawn as uppercase at reduced size */
     smallCaps: boolean
+    /** When true, a soft-hyphen was inserted by the browser at the end of
+        this fragment; the emitter should draw a trailing hyphen. */
+    trailingHyphen: boolean
 }
 
 /** A piece of a word run drawn with a single embedded font. */
@@ -1048,6 +1051,20 @@ async function emitPage(
                 word.width * PX_TO_PT,
                 word.color
             );
+        }
+        if (word.trailingHyphen) {
+            // The browser broke this word at a hyphenation point; the
+            // hyphen glyph is rendered by the UA but is not part of the
+            // DOM text node, so we synthesize it at the measured end of
+            // the fragment.
+            const hyphenFont = segments[0].font.pdfFont;
+            page.drawText("-", {
+                x: xPt + word.width * PX_TO_PT,
+                y: baselineY,
+                size: sizePt,
+                font: hyphenFont,
+                color: word.color
+            });
         }
         if (
             word.decoration.lineThrough ||
@@ -2050,9 +2067,13 @@ function collectWords(
     }
     return s;
 };
-        const pushRun = (runText: string, rect: DOMRect): void => {
+        const pushRun = (
+            runText: string,
+            rect: DOMRect,
+            trailingHyphen = false
+        ): void => {
             const finalText = applyTransform(runText);
-            words.push({
+            const runInfo = {
                 text: finalText,
                 segments: buildWordSegments(
                     ctx,
@@ -2070,8 +2091,10 @@ function collectWords(
                 fontKey,
                 color,
                 decoration: decorations,
-                smallCaps
-            });
+                smallCaps,
+                trailingHyphen
+            };
+            words.push(runInfo);
         };
         const measureRange = (start: number, end: number): DOMRect => {
             range.setStart(textNode, start);
@@ -2108,22 +2131,35 @@ function collectWords(
                 // Group its characters by line and emit one run per group —
                 // otherwise the whole run would be drawn once per fragment
                 // and overlap the following text.
+                //
+                // Use the *last* client rect for each character: at a
+                // hyphenation point the browser reports a multi-line bounding
+                // rect whose top is the first line, but the glyph itself is
+                // on the second line. Using the last rect keeps the split
+                // aligned with where the glyph is actually rendered.
+                const hyphenates = style.hyphens === "auto";
                 let groupStart = runStart;
                 let lineTop: number | null = null;
                 for (let k = runStart; k < runEnd; k++) {
-                    const charRect = measureRange(k, k + 1);
-                    if (charRect.width === 0 || charRect.height === 0) {
+                    range.setStart(textNode, k);
+                    range.setEnd(textNode, k + 1);
+                    const charRects = Array.from(range.getClientRects()).filter(
+                        r => r.width > 0 && r.height > 0
+                    );
+                    if (charRects.length === 0) {
                         continue;
                     }
+                    const charTop = charRects[charRects.length - 1].top;
                     if (lineTop === null) {
-                        lineTop = charRect.top;
-                    } else if (Math.abs(charRect.top - lineTop) > 1) {
+                        lineTop = charTop;
+                    } else if (Math.abs(charTop - lineTop) > 1) {
                         pushRun(
                             text.slice(groupStart, k),
-                            measureRange(groupStart, k)
+                            measureRange(groupStart, k),
+                            hyphenates
                         );
                         groupStart = k;
-                        lineTop = charRect.top;
+                        lineTop = charTop;
                     }
                 }
                 if (groupStart < runEnd) {
@@ -2328,7 +2364,8 @@ function collectListMarkers(
             fontKey,
             color,
             decoration: {underline: null, overline: null, lineThrough: null},
-            smallCaps: false
+            smallCaps: false,
+            trailingHyphen: false
         });
     }
     return result;
@@ -2458,7 +2495,8 @@ function collectMarginBoxes(
             color,
             decoration: {underline: null, overline: null, lineThrough: null},
             smallCaps:
-                (pseudoStyle.fontVariantCaps || "").includes("small-caps")
+                (pseudoStyle.fontVariantCaps || "").includes("small-caps"),
+            trailingHyphen: false
         });
     }
     return words;
