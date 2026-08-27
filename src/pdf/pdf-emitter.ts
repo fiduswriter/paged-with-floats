@@ -2104,13 +2104,28 @@ function collectWords(
         const measureRangeOnLine = (
             start: number,
             end: number,
-            lineTop: number
+            lineTop: number,
+            dropTrailingHyphen = false
         ): DOMRect => {
             range.setStart(textNode, start);
             range.setEnd(textNode, end);
-            const rects = Array.from(range.getClientRects()).filter(
+            let rects = Array.from(range.getClientRects()).filter(
                 r => r.width > 0 && r.height > 0 && Math.abs(r.top - lineTop) <= 1
             );
+            if (
+                dropTrailingHyphen &&
+                rects.length > 1 &&
+                // The browser renders the UA-inserted hyphen as a separate,
+                // narrow rect that starts exactly where the letters end. A
+                // normal last character is part of the letters' own rect and
+                // is far wider than a hyphen.
+                rects[rects.length - 1].width <= fontSizePx * 0.6 &&
+                Math.abs(
+                    rects[rects.length - 1].left - rects[rects.length - 2].right
+                ) <= 1
+            ) {
+                rects = rects.slice(0, -1);
+            }
             if (rects.length === 0) {
                 return range.getBoundingClientRect();
             }
@@ -2191,25 +2206,38 @@ function collectWords(
                     } else if (Math.abs(charTop - lineTop) > 1) {
                         const fragment = text.slice(groupStart, k);
                         let runText = fragment;
-                        let runRect = measureRangeOnLine(groupStart, k, lineTop);
                         let addHyphen = hyphenates;
                         if (runText.endsWith("\u00AD")) {
                             // Soft hyphen: invisible in the source but rendered
                             // by the UA at the break. Measure the letters only
                             // and synthesize a visible hyphen.
                             runText = runText.slice(0, -1);
-                            runRect = measureRangeOnLine(
-                                groupStart,
-                                k - 1,
-                                lineTop
-                            );
                             addHyphen = true;
                         } else if (/[-\u2011]$/.test(runText)) {
                             // A visible hyphen is already part of the DOM text;
                             // keep it and do not synthesize another one.
                             addHyphen = false;
                         }
-                        pushRun(runText, runRect, addHyphen);
+                        // When the hyphen is synthesized (auto-hyphenation or a
+                        // soft hyphen), measure the letters without the UA
+                        // hyphen's reserved space: the browser renders the
+                        // hyphen as a narrow rect that would otherwise stretch
+                        // the letters to fill its width and push the drawn
+                        // hyphen past the column edge.
+                        let measureEnd = k;
+                        if (runText.length < fragment.length) {
+                            measureEnd = k - 1;
+                        }
+                        pushRun(
+                            runText,
+                            measureRangeOnLine(
+                                groupStart,
+                                measureEnd,
+                                lineTop,
+                                addHyphen
+                            ),
+                            addHyphen
+                        );
                         groupStart = k;
                         lineTop = charTop;
                     }

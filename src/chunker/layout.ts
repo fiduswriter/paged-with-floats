@@ -805,26 +805,55 @@ class Layout {
 		this.boundsDirty = true;
 		// Compute bounds immediately (the overflow phase relies on
 		// refreshBounds, but callers may read this.bounds directly).
-		const elRect = dest.getBoundingClientRect();
 		if (dest.classList.contains("paged_column") && dest.closest(".paged_flow")) {
-			const flow = dest.closest(".paged_flow")!;
-			const hostRect = flow.getBoundingClientRect();
-			const topFloat = flow.querySelector(
-				":scope > .paged_float_top",
-			) as HTMLElement | null;
-			const topFloatHeight = topFloat
-				? topFloat.getBoundingClientRect().height
-				: 0;
-			const availableHeight = Math.max(0, hostRect.height - topFloatHeight);
-			this.bounds = new DOMRect(
-				elRect.left,
-				hostRect.top + topFloatHeight,
-				elRect.width,
-				availableHeight,
-			);
+			this.bounds = this.manualColumnBounds(dest);
 		} else {
 			this.bounds = this.refreshBounds();
 		}
+	}
+
+	/**
+	 * Bounds of a manual column: the flow host's vertical extent reduced by
+	 * the top page float, with the column's own horizontal extent.
+	 *
+	 * Overflow detection reads against these bounds, so the physical column
+	 * row is sized to the same available height. Without that, the columns'
+	 * `height: 100%` resolves against a content-derived flex size that does
+	 * not shrink for a tall top float, and their text spills past the page
+	 * bottom — over the footnotes and beyond the margins — while the engine
+	 * keeps detecting overflow against the (shorter) float-adjusted bounds.
+	 *
+	 * @param {HTMLElement} column - A `.paged_column` box inside a `.paged_flow`.
+	 * @returns {DOMRect} The bounds used for overflow detection.
+	 */
+	private manualColumnBounds(column: HTMLElement): DOMRect {
+		const flow = column.closest(".paged_flow")!;
+		const hostRect = flow.getBoundingClientRect();
+		const topFloat = flow.querySelector(
+			":scope > .paged_float_top",
+		) as HTMLElement | null;
+		const topFloatHeight = topFloat
+			? topFloat.getBoundingClientRect().height
+			: 0;
+		const availableHeight = Math.max(0, hostRect.height - topFloatHeight);
+		// Size the column row to the available height so the physical column
+		// boxes match the overflow-detection bounds (their `height: 100%`
+		// resolves against this definite height). The row's position below
+		// the top float already follows from the flex column layout.
+		const row = column.parentElement;
+		if (row && row.classList.contains("paged_columns")) {
+			const heightPx = `${Math.floor(availableHeight)}px`;
+			if (row.style.height !== heightPx) {
+				row.style.height = heightPx;
+			}
+		}
+		const elRect = column.getBoundingClientRect();
+		return new DOMRect(
+			elRect.left,
+			hostRect.top + topFloatHeight,
+			elRect.width,
+			availableHeight,
+		);
 	}
 
 	/**
@@ -895,21 +924,9 @@ class Layout {
 				// Manual columns are content-sized; overflow is detected
 				// against the flow host's vertical extent (the visible page
 				// region), while the horizontal extent is the column's own.
-				const flow = this.element.closest(".paged_flow")!;
-				const hostRect = flow.getBoundingClientRect();
-				const topFloat = flow.querySelector(
-					":scope > .paged_float_top",
-				) as HTMLElement | null;
-				const topFloatHeight = topFloat
-					? topFloat.getBoundingClientRect().height
-					: 0;
-				const availableHeight = Math.max(0, hostRect.height - topFloatHeight);
-				this.bounds = new DOMRect(
-					elRect.left,
-					hostRect.top + topFloatHeight,
-					elRect.width,
-					availableHeight,
-				);
+				// The helper also keeps the physical column row's height in
+				// lockstep with these bounds.
+				this.bounds = this.manualColumnBounds(this.element);
 			} else {
 				this.bounds = elRect;
 			}
@@ -1401,6 +1418,14 @@ class Layout {
 				}
 
 				if (!node || newBreakToken) {
+					if (newBreakToken) {
+						this.sweepResidualColumnOverflow(
+							wrapper,
+							source,
+							newBreakToken,
+							prevBreakToken,
+						);
+					}
 					return new RenderResult(newBreakToken);
 				}
 			}
@@ -1500,6 +1525,14 @@ class Layout {
 
 		this.hooks &&
 			this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
+		if (newBreakToken) {
+			this.sweepResidualColumnOverflow(
+				wrapper,
+				source,
+				newBreakToken,
+				prevBreakToken,
+			);
+		}
 		return new RenderResult(newBreakToken);
 	}
 
@@ -1876,20 +1909,29 @@ class Layout {
 
 				if (!renderedNode) {
 					// Find closest element with data-ref
-					let prevNode: Node | null = prevValidNode(temp);
-					if (!isElement(prevNode)) {
-						prevNode = prevNode!.parentElement;
+					let prevNode: Node | null | undefined = prevValidNode(temp);
+					if (prevNode && !isElement(prevNode)) {
+						prevNode = prevNode.parentElement;
 					}
-					renderedNode = findElement(prevNode as Node, rendered);
+					if (!prevNode) {
+						return;
+					}
+					renderedNode = findElement(prevNode, rendered);
+					if (!renderedNode) {
+						return;
+					}
 					// Check if temp is the last rendered node at its level.
 					if (!temp.nextSibling) {
 						// We need to ensure that the previous sibling of temp is fully rendered.
 						const renderedNodeFromSource = findElement(
-							renderedNode as Node,
+							renderedNode,
 							source,
 						);
+						if (!renderedNodeFromSource) {
+							return;
+						}
 						const walker = document.createTreeWalker(
-							renderedNodeFromSource!,
+							renderedNodeFromSource,
 							NodeFilter.SHOW_ELEMENT,
 						);
 						const lastChildOfRenderedNodeFromSource = walker.lastChild();
@@ -1920,13 +1962,17 @@ class Layout {
 					renderedNode = findElement(container, rendered);
 
 					if (!renderedNode) {
-						renderedNode = findElement(
-							prevValidNode(container) as Node,
-							rendered,
-						);
+						const prevNode = prevValidNode(container);
+						if (!prevNode) {
+							return;
+						}
+						renderedNode = findElement(prevNode, rendered);
 					}
 
-					parent = findElement(renderedNode!, source);
+					if (!renderedNode) {
+						return;
+					}
+					parent = findElement(renderedNode, source);
 				}
 				index = indexOfTextNode(temp!, parent! as Element, hyphen);
 				// No seperation for the first textNode of an element
@@ -1942,13 +1988,16 @@ class Layout {
 			renderedNode = findElement(container.parentNode as Node, rendered);
 
 			if (!renderedNode) {
-				renderedNode = findElement(
-					prevValidNode(container.parentNode as Node) as Node,
-					rendered,
-				);
+				const prevNode = prevValidNode(container.parentNode as Node);
+				if (!prevNode) {
+					return;
+				}
+				renderedNode = findElement(prevNode, rendered);
 			}
-
-			parent = findElement(renderedNode!, source);
+			if (!renderedNode) {
+				return;
+			}
+			parent = findElement(renderedNode, source);
 			index = indexOfTextNode(container, parent! as Element, hyphen);
 
 			if (index === -1) {
@@ -2036,10 +2085,16 @@ class Layout {
 			});
 
 			let overflow = this.createOverflow(overflowRange, rendered, source);
+			if (!overflow) {
+				// The rendered range could not be mapped back to the source
+				// (e.g. its nodes were detached during a residual sweep);
+				// skip it rather than crash on a null break token.
+				return;
+			}
 			if (!breakToken) {
-				breakToken = new BreakToken(node!, [overflow!]);
+				breakToken = new BreakToken(node!, [overflow]);
 			} else {
-				breakToken.overflow.push(overflow!);
+				breakToken.overflow.push(overflow);
 			}
 
 			// breakToken is nullable
@@ -2083,8 +2138,13 @@ class Layout {
 		});
 
 		// And then see if the last element has been completely removed and not split.
-		if ((rendered as WithRefs).indexOfRefs && extract && breakToken!.overflow.length) {
-			let firstOverflow = breakToken!.overflow[0];
+		if (
+			(rendered as WithRefs).indexOfRefs &&
+			extract &&
+			breakToken &&
+			breakToken.overflow.length
+		) {
+			let firstOverflow = breakToken.overflow[0];
 			if (firstOverflow?.node && firstOverflow.content) {
 				// Remove data-refs in the overflow from the index.
 				Array.from(
@@ -2098,16 +2158,18 @@ class Layout {
 			}
 		}
 
-		breakToken!.overflow.forEach((overflow) => {
-			this.hooks &&
-				this.hooks.afterOverflowRemoved.trigger(
-					overflow.content,
-					rendered,
-					this,
-				);
-		});
+		if (breakToken) {
+			breakToken.overflow.forEach((overflow) => {
+				this.hooks &&
+					this.hooks.afterOverflowRemoved.trigger(
+						overflow.content,
+						rendered,
+						this,
+					);
+			});
+		}
 
-		return breakToken!;
+		return breakToken as BreakToken;
 	}
 
 	/**
@@ -2284,6 +2346,44 @@ class Layout {
 	}
 
 	/**
+	 * Sweeps every manual column of a page for overflow that appeared after
+	 * the page's last overflow check — for example the footnote area growing
+	 * and shrinking the flow host below already-laid-out text, or a split
+	 * paragraph re-wrapping slightly taller after its footnotes were pulled
+	 * out. Any residue found is folded into the outgoing break token so the
+	 * next page rebuilds it in document order.
+	 *
+	 * @param {HTMLElement} wrapper - The page's flow host (`.paged_flow`).
+	 * @param {DocumentFragment|Node} source - The source content.
+	 * @param {BreakToken} breakToken - The outgoing break token.
+	 * @param {BreakToken|undefined} prevBreakToken - The page's incoming token.
+	 * @returns {void}
+	 */
+	private sweepResidualColumnOverflow(
+		wrapper: HTMLElement,
+		source: DocumentFragment | Node,
+		breakToken: BreakToken,
+		prevBreakToken: BreakToken | undefined,
+	): void {
+		const pageColumns = wrapper.querySelectorAll(
+			":scope > .paged_columns > .paged_column",
+		);
+		for (const col of Array.from(pageColumns)) {
+			const column = col as HTMLElement;
+			const columnBounds = this.manualColumnBounds(column);
+			if (this.hasOverflow(column, columnBounds)) {
+				this.extractResidualOverflow(
+					column,
+					columnBounds,
+					source,
+					breakToken,
+					prevBreakToken,
+				);
+			}
+		}
+	}
+
+	/**
 	 * Does the element exceed the bounds?
 	 *
 	 * @param {element} element
@@ -2308,7 +2408,7 @@ class Layout {
 		) {
 			constrainingElement = element;
 		}
-		let { width, height, bottom } = element.getBoundingClientRect();
+		let { width, height } = element.getBoundingClientRect();
 		let scrollWidth = constrainingElement ? constrainingElement.scrollWidth : 0;
 		let scrollHeight = constrainingElement
 			? constrainingElement.scrollHeight
@@ -2925,11 +3025,13 @@ class Layout {
 		let position: Node | null = rangeStart;
 		range = this.getRange(rangeStart, offset as number, rangeEnd);
 		if (isText(rangeStart)) {
-			rangeStart.parentElement!.dataset.splitTo =
-				rangeStart.parentElement!.dataset.ref!;
-			rangeStart.parentElement!.dataset.rangeStartOverflow = String(true);
-			rangeStart.parentElement!.dataset.overflowTagged = String(true);
-			position = rangeStart.parentElement;
+			if (rangeStart.parentElement) {
+				rangeStart.parentElement!.dataset.splitTo =
+					rangeStart.parentElement!.dataset.ref!;
+				rangeStart.parentElement!.dataset.rangeStartOverflow = String(true);
+				rangeStart.parentElement!.dataset.overflowTagged = String(true);
+				position = rangeStart.parentElement;
+			}
 		} else {
 			(rangeStart as Element).dataset.rangeStartOverflow = String(true);
 		}
@@ -2945,19 +3047,29 @@ class Layout {
 				if (nextNode) {
 					(nextNode as Element).dataset.rangeEndOverflow = String(true);
 					(nextNode as Element).dataset.overflowTagged = String(true);
+				} else {
+					// The range ends at the last rendered node. There is no
+					// following node to carry the range-end marker, so mark
+					// the range end itself; otherwise re-detection keeps
+					// returning the same range and never advances past the
+					// collected overflow.
+					rangeEnd.dataset.rangeEndOverflow = String(true);
+					rangeEnd.dataset.overflowTagged = String(true);
 				}
 			} else {
 				rangeEnd.dataset.rangeEndOverflow = String(true);
 				rangeEnd.dataset.overflowTagged = String(true);
 			}
 		} else {
-			(rangeEnd.parentElement as Element).dataset.rangeEndOverflow =
-				String(true);
+			if (rangeEnd.parentElement) {
+				(rangeEnd.parentElement as Element).dataset.rangeEndOverflow =
+					String(true);
+			}
 		}
 
 		// Add splitTo
-		while (position !== rendered) {
-			if (position!.previousSibling) {
+		while (position !== rendered && position) {
+			if (position!.previousSibling && position!.parentElement) {
 				position!.parentElement!.dataset.splitTo =
 					position!.parentElement!.dataset.ref!;
 			}
@@ -2967,29 +3079,43 @@ class Layout {
 		// Tag ancestors in the range so we don't generate additional ranges
 		// that then cause problems when removing the ranges.
 		position = rangeStart;
-		while (position!.parentElement !== range!.commonAncestorContainer) {
+		while (
+			position &&
+			position.parentElement !== range!.commonAncestorContainer
+		) {
 			position = position!.parentElement;
-			(position as Element).dataset.overflowTagged = String(true);
+			if (position) {
+				(position as Element).dataset.overflowTagged = String(true);
+			}
 		}
 
 		if (isElement(position)) {
 			let stopAt: Node | null | undefined = rangeEnd;
-			while (stopAt!.parentElement !== range!.commonAncestorContainer) {
-				stopAt = stopAt!.parentElement;
+			while (
+				stopAt &&
+				stopAt.parentElement !== range!.commonAncestorContainer
+			) {
+				stopAt = stopAt.parentElement;
 			}
 
-			while (position !== stopAt) {
+			while (position !== stopAt && position) {
 				position = position!.nextSibling;
 				if (isElement(position)) {
 					position.dataset.overflowTagged = String(true);
 				}
 			}
-		} else {
+		} else if (position) {
 			position = position!.parentElement;
 		}
-		while (!(position as Element).nextElementSibling && position !== rendered) {
+		while (
+			position &&
+			!(position as Element).nextElementSibling &&
+			position !== rendered
+		) {
 			position = position!.parentElement;
-			(position as Element).dataset.overflowTagged = String(true);
+			if (position) {
+				(position as Element).dataset.overflowTagged = String(true);
+			}
 		}
 
 		return range;
@@ -3093,6 +3219,13 @@ class Layout {
 			return;
 		}
 
+		// startOfNewOverflow can report overflow without pinning a start node
+		// (e.g. a detached text node after an extraction); without a concrete
+		// start there is no range to collect, so bail rather than crash.
+		if (!startOfOverflow) {
+			return;
+		}
+
 		let startOfOverflowIsText = isText(startOfOverflow);
 		if (
 			(startOfOverflowIsText &&
@@ -3185,20 +3318,28 @@ class Layout {
 			if (sibling && siblingBounds?.height && !rowspanNeedsBreakAt) {
 				// Is the sibling entirely in overflow? If yes, so must all following
 				// siblings be - add them to this range; they can't have anything we
-				// want to keep on this page.
-				const siblingStartsBeyondVisible =
-					this.rectOverflows(
-						new DOMRect(
-							siblingBounds.left,
-							siblingBounds.top,
-							0,
-							0,
-						),
-						0,
-						this.getFragmentainer(sibling),
-						bounds,
-					);
-				if (siblingStartsBeyondVisible && !visibleSiblings) {
+				// want to keep on this page. A sibling that starts inside the
+				// visible area but extends past its bottom edge (e.g. a paragraph
+				// taller than the remaining space) is also overflow: leaving it
+				// behind strands it on the page and the same range gets
+				// re-detected forever.
+				const frag = this.getFragmentainer(sibling);
+				const siblingStartsBeyondVisible = this.rectOverflows(
+					new DOMRect(siblingBounds.left, siblingBounds.top, 0, 0),
+					0,
+					frag,
+					bounds,
+				);
+				const siblingEndsBeyondVisible = this.rectOverflows(
+					new DOMRect(siblingBounds.left, siblingBounds.bottom, 0, 0),
+					0,
+					frag,
+					bounds,
+				);
+				if (
+					(siblingStartsBeyondVisible || siblingEndsBeyondVisible) &&
+					!visibleSiblings
+				) {
 					if (!rowspanNeedsBreakAt) {
 						rangeEnd = check!.parentElement!.lastChild;
 					}

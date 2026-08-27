@@ -436,7 +436,7 @@ export default `
 
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_columns {
 	display: flex;
-	flex: 1 1 auto;
+	flex: 1 1 0;
 	min-height: 0;
 }
 
