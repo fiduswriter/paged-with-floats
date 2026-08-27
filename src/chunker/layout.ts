@@ -785,7 +785,85 @@ class Layout {
 		breakToken: BreakToken | undefined,
 	): HTMLElement[] {
 		this.append(node, wrapper, source, breakToken, false);
-		return this.startSpanRow(wrapper);
+		const newColumns = this.startSpanRow(wrapper);
+		// Opening a new segment row shrinks every segment row (the flow
+		// host's height is fixed, so flex re-distributes the free space).
+		// Content already laid out in an earlier column can now overflow its
+		// shorter box; move that overflow into the next column of the same
+		// segment so it is drawn instead of being dropped.
+		this.migrateShrunkenSegmentOverflow(wrapper, source);
+		return newColumns;
+	}
+
+	/**
+	 * After a new `column-span` segment row is opened, re-check every earlier
+	 * segment's columns: their rows have shrunk, so content that previously
+	 * fitted can now overflow. Move the overflowing content into the next
+	 * column of the same segment, preserving it in document order.
+	 *
+	 * @param {HTMLElement} wrapper - The flow host.
+	 * @param {DocumentFragment|Node} source - The source content.
+	 * @returns {void}
+	 */
+	private migrateShrunkenSegmentOverflow(
+		wrapper: HTMLElement,
+		source: DocumentFragment | Node,
+	): void {
+		const rows = Array.from(
+			wrapper.querySelectorAll(":scope > .paged_columns"),
+		);
+		const lastRow = rows[rows.length - 1];
+		for (const row of rows) {
+			if (row === lastRow) {
+				continue;
+			}
+			const columns = Array.from(
+				row.querySelectorAll<HTMLElement>(":scope > .paged_column"),
+			);
+			for (let i = 0; i < columns.length; i++) {
+				const column = columns[i];
+				let guard = 0;
+				while (this.hasOverflow(column, this.manualColumnBounds(column))) {
+					if (++guard > 10) {
+						break;
+					}
+					column
+						.querySelectorAll(
+							"[data-overflow-tagged], [data-range-start-overflow], [data-range-end-overflow]",
+						)
+						.forEach((el) => {
+							el.removeAttribute("data-overflow-tagged");
+							el.removeAttribute("data-range-start-overflow");
+							el.removeAttribute("data-range-end-overflow");
+						});
+					column.removeAttribute("data-overflow-tagged");
+					column.removeAttribute("data-range-start-overflow");
+					column.removeAttribute("data-range-end-overflow");
+					const range = this.findOverflow(
+						column,
+						this.manualColumnBounds(column),
+						source,
+					);
+					if (!range) {
+						break;
+					}
+					const fragment = this.removeOverflow(range);
+					if (!fragment || !fragment.childNodes.length) {
+						break;
+					}
+					// Move the overflow into the next column of the same
+					// segment. If this is the segment's last column there is
+					// nowhere sensible on this page to put it (the content
+					// belongs before the span); leave it for the normal
+					// overflow path instead of pushing it past the span.
+					const target = columns[i + 1];
+					if (!target) {
+						break;
+					}
+					target.appendChild(fragment);
+				}
+			}
+		}
 	}
 
 	/**
@@ -818,14 +896,9 @@ class Layout {
 	 * `column-span: all` segments above it.
 	 *
 	 * Overflow detection reads against these bounds, so the physical column
-	 * row is sized to the same available height. Without that, the columns'
-	 * `height: 100%` resolves against a content-derived flex size that does
-	 * not shrink for a tall top float, and their text spills past the page
-	 * bottom — over the footnotes and beyond the margins — while the engine
-	 * keeps detecting overflow against the (shorter) float-adjusted bounds.
-	 * Using the flow host's full height here would also make columns inside
-	 * a shorter `column-span` segment accept the whole page height, letting
-	 * their text overlap whatever follows.
+	 * boxes match the detection exactly. Using the flow host's full height
+	 * here would make columns inside a shorter `column-span` segment accept
+	 * the whole page height, letting their text overlap whatever follows.
 	 *
 	 * @param {HTMLElement} column - A `.paged_column` box inside a `.paged_flow`.
 	 * @returns {DOMRect} The bounds used for overflow detection.
@@ -833,16 +906,6 @@ class Layout {
 	private manualColumnBounds(column: HTMLElement): DOMRect {
 		const elRect = column.getBoundingClientRect();
 		const availableHeight = Math.max(0, elRect.height);
-		// Size the column row to the available height so the physical column
-		// boxes match the overflow-detection bounds (their `height: 100%`
-		// resolves against this definite height).
-		const row = column.parentElement;
-		if (row && row.classList.contains("paged_columns")) {
-			const heightPx = `${Math.floor(availableHeight)}px`;
-			if (row.style.height !== heightPx) {
-				row.style.height = heightPx;
-			}
-		}
 		return new DOMRect(
 			elRect.left,
 			elRect.top,
