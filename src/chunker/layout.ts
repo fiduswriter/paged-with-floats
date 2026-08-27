@@ -813,8 +813,9 @@ class Layout {
 	}
 
 	/**
-	 * Bounds of a manual column: the flow host's vertical extent reduced by
-	 * the top page float, with the column's own horizontal extent.
+	 * Bounds of a manual column: the column's own box, which the flex column
+	 * row already sizes to account for the top page float and any
+	 * `column-span: all` segments above it.
 	 *
 	 * Overflow detection reads against these bounds, so the physical column
 	 * row is sized to the same available height. Without that, the columns'
@@ -822,24 +823,19 @@ class Layout {
 	 * not shrink for a tall top float, and their text spills past the page
 	 * bottom — over the footnotes and beyond the margins — while the engine
 	 * keeps detecting overflow against the (shorter) float-adjusted bounds.
+	 * Using the flow host's full height here would also make columns inside
+	 * a shorter `column-span` segment accept the whole page height, letting
+	 * their text overlap whatever follows.
 	 *
 	 * @param {HTMLElement} column - A `.paged_column` box inside a `.paged_flow`.
 	 * @returns {DOMRect} The bounds used for overflow detection.
 	 */
 	private manualColumnBounds(column: HTMLElement): DOMRect {
-		const flow = column.closest(".paged_flow")!;
-		const hostRect = flow.getBoundingClientRect();
-		const topFloat = flow.querySelector(
-			":scope > .paged_float_top",
-		) as HTMLElement | null;
-		const topFloatHeight = topFloat
-			? topFloat.getBoundingClientRect().height
-			: 0;
-		const availableHeight = Math.max(0, hostRect.height - topFloatHeight);
+		const elRect = column.getBoundingClientRect();
+		const availableHeight = Math.max(0, elRect.height);
 		// Size the column row to the available height so the physical column
 		// boxes match the overflow-detection bounds (their `height: 100%`
-		// resolves against this definite height). The row's position below
-		// the top float already follows from the flex column layout.
+		// resolves against this definite height).
 		const row = column.parentElement;
 		if (row && row.classList.contains("paged_columns")) {
 			const heightPx = `${Math.floor(availableHeight)}px`;
@@ -847,10 +843,9 @@ class Layout {
 				row.style.height = heightPx;
 			}
 		}
-		const elRect = column.getBoundingClientRect();
 		return new DOMRect(
 			elRect.left,
-			hostRect.top + topFloatHeight,
+			elRect.top,
 			elRect.width,
 			availableHeight,
 		);
@@ -2903,20 +2898,22 @@ class Layout {
 							bounds,
 						)
 					) {
-						let ascended: boolean;
+					let ascended: boolean;
+					do {
+						ascended = false;
 						do {
-							ascended = false;
-							do {
-								node = (node! as Element).nextElementSibling;
-							} while (node && (node as Element).dataset.overflowTagged);
-							if (!node && rendered !== prev) {
-								ascended = true;
-								prev = node = prev!.parentElement;
-							}
-						} while (ascended && node && node !== topNode);
-						if (!node || node == topNode) {
-							return [null, false];
+							node = node
+								? (node as Element).nextElementSibling
+								: null;
+						} while (node && (node as Element).dataset.overflowTagged);
+						if (!node && rendered !== prev) {
+							ascended = true;
+							prev = node = prev!.parentElement;
 						}
+					} while (ascended && node && node !== topNode);
+					if (!node || node == topNode) {
+						return [null, false];
+					}
 					} else {
 						// Node is causing the overflow via padding and margin or text content.
 						done = true;
@@ -2926,19 +2923,25 @@ class Layout {
 					// overflowing children were found. Check the node's next sibling or one of
 					// an ancestor.
 					do {
-						while (!(node! as Element).nextElementSibling) {
+						while (node && !(node as Element).nextElementSibling) {
 							if (node == rendered) {
 								return [null, false];
 							}
 							node = node!.parentElement;
 						}
+						if (!node) {
+							return [null, false];
+						}
 						do {
-							node = (node! as Element).nextElementSibling;
+							node = node
+								? (node as Element).nextElementSibling
+								: null;
 						} while (
-							(node! as Element).nextElementSibling &&
+							node &&
+							(node as Element).nextElementSibling &&
 							(node as Element).dataset.overflowTagged
 						);
-					} while ((node as Element).dataset.overflowTagged);
+					} while (node && (node as Element).dataset.overflowTagged);
 				}
 			} while (node && !childNode && !done);
 
