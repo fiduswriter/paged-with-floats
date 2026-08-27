@@ -1386,23 +1386,33 @@ class Layout {
 
 			// A `column-span: all` element takes a full-width row between
 			// column segments; the flow after it continues in a fresh set of
-			// columns (column 0 again). If the current columns already
-			// overflow, that overflow must be handled first (the span then
-			// interrupts at its natural flow position, possibly on the next
-			// page).
-			if (
-				this.isColumnSpan(node) &&
-				columns.length > 1 &&
-				!this.hasOverflow(dest, this.refreshBounds())
-			) {
-				columns = this.applyColumnSpan(wrapper, node!, source, breakToken);
-				colIndex = 0;
-				dest = columns[0];
-				this.setActiveColumn(dest);
-				bounds = this.refreshBounds();
-				hasRenderedContent = true;
-				walker = walk(nodeAfter(node!, source) as Node, source);
-				continue;
+			// columns (column 0 again). If the current column is full, its
+			// overflow can still be absorbed by the remaining columns of this
+			// segment (migrateShrunkenSegmentOverflow runs when the span
+			// opens) — only defer the span when the segment's last column is
+			// full, in which case the overflow must go to the next page.
+			if (this.isColumnSpan(node) && columns.length > 1) {
+				const hasOverflow = this.hasOverflow(
+					dest,
+					this.refreshBounds(),
+				);
+				const canAbsorb =
+					!hasOverflow || colIndex < columns.length - 1;
+				if (canAbsorb) {
+					columns = this.applyColumnSpan(
+						wrapper,
+						node!,
+						source,
+						breakToken,
+					);
+					colIndex = 0;
+					dest = columns[0];
+					this.setActiveColumn(dest);
+					bounds = this.refreshBounds();
+					hasRenderedContent = true;
+					walker = walk(nodeAfter(node!, source) as Node, source);
+					continue;
+				}
 			}
 
 			// Check whether we have overflow when we've completed laying out a top
