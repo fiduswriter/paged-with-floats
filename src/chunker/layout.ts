@@ -1369,9 +1369,16 @@ class Layout {
 					node,
 				);
 
-				if (newBreakToken && node === undefined) {
-					// We have run out of content. Do add the overflow to a new page but
-					// don't repeat the whole thing again.
+				if (
+					newBreakToken &&
+					node === undefined &&
+					colIndex >= columns.length - 1
+				) {
+					// We have run out of content. Do add the overflow to a new
+					// page but don't repeat the whole thing again. Only finish
+					// when there is no further column on this page to fill —
+					// otherwise the remaining columns are skipped and the
+					// overflow jumps to the next page.
 					newBreakToken.setFinished();
 				}
 
@@ -1498,7 +1505,11 @@ class Layout {
 					prevBreakToken,
 					undefined,
 				);
-				if (newBreakToken && node === undefined) {
+				if (
+					newBreakToken &&
+					node === undefined &&
+					colIndex >= columns.length - 1
+				) {
 					newBreakToken.setFinished();
 				}
 				if (
