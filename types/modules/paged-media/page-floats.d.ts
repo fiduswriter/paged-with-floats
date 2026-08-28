@@ -5,6 +5,7 @@ import type BreakToken from "../../chunker/breaktoken.js";
 import type { CssNode, List } from "css-tree";
 interface FloatsPage {
     element: HTMLElement;
+    createWrapper: () => HTMLDivElement;
 }
 interface FloatsChunker {
     stopped?: boolean;
@@ -178,10 +179,50 @@ declare class PageFloats extends Handler {
      * Bottom edge of the rendered flow content within the page,
      * excluding the float spacer.
      *
+     * For manual-columns pages the flow lives inside the column boxes; the
+     * bottom is the deepest visible line across all columns (the column
+     * boxes themselves are full-height and must not count as content).
+     *
      * @param {Element} content - The .paged_page_content element.
      * @returns {number} Pixel coordinate of the flow's bottom edge.
      */
     flowBottom(content: HTMLElement): number;
+    /**
+     * Bottom edge of a manual column's *content*, excluding the column
+     * box itself (which spans the full page height by design).
+     *
+     * @param {HTMLElement} column - The .paged_column element.
+     * @returns {number} Pixel coordinate of the deepest content line.
+     */
+    private columnContentBottom;
+    /**
+     * Bottom edge of flow content sitting in a *visible* column of the
+     * wrapper.
+     *
+     * A single union bounding rect over the whole wrapper is wrong under
+     * multi-column layout: fragments continue into a hidden spill column to
+     * the right of the last visible one, and that column's line bottoms
+     * masquerade as flow content reaching the page bottom — which made top
+     * floats defer (or force-place late) even when visible columns had room.
+     * Client rects are therefore filtered to those starting left of the
+     * spill-column edge before taking the maximum bottom.
+     *
+     * @param {HTMLElement} wrapper - The page's flow content wrapper.
+     * @returns {number} Pixel coordinate of the visible flow's bottom edge.
+     */
+    private visibleFlowBottom;
+    /**
+     * The left edge of the wrapper's hidden spill column, or null when the
+     * wrapper is not a multi-column fragmentainer.
+     *
+     * Mirrors the chunker's fragmentainer math (`column-gap: normal`
+     * approximated via font size; fragmented boxes anchored at their first
+     * client rect).
+     *
+     * @param {HTMLElement} wrapper - The flow content wrapper.
+     * @returns {number|null} Spill column left edge in pixels, or null.
+     */
+    private spillColumnLeft;
     /**
      * The wrapper holding the normal flow content of a page.
      *
@@ -207,12 +248,6 @@ declare class PageFloats extends Handler {
      * @returns {void}
      */
     syncSpacer(content: HTMLElement): void;
-    /**
-     * Border box height plus vertical margins of an element.
-     *
-     * @param {Element} element - The element to measure.
-     * @returns {number} Outer height in pixels.
-     */
     /**
      * Border box height plus vertical margins of an element.
      *

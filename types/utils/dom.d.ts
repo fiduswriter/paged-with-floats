@@ -33,7 +33,7 @@ export declare function walk(start: Node, limiter?: Node): Generator<Node>;
  * @param {boolean} [descend=false] - Whether to descend into child nodes.
  * @returns {Node|undefined} The next significant node or undefined if none found.
  */
-export declare function nodeAfter(node: Node, limiter?: Node, descend?: boolean): Node | undefined;
+export declare function nodeAfter(node: Node, limiter?: Node, descend?: boolean, skipIgnorable?: boolean): Node | undefined;
 /**
  * Finds the previous significant node before the given node, optionally descending into children.
  * Returns undefined if the limiter node is reached.
@@ -282,6 +282,22 @@ export declare function hasTextContent(node: Node): boolean;
  * @returns {number} The index of the text node within the parent's child nodes, or -1 if not found.
  */
 export declare function indexOfTextNode(node: Node, parent: Element, hyphen: string): number;
+/**
+ * Finds the index of a rendered text node within its source parent. Text
+ * nodes are matched by their ordinal position among non-ignorable text-node
+ * children, so the mapping stays correct even when footnote spans/calls have
+ * changed the element's child list.
+ *
+ * @param {Node} node The rendered text node to map.
+ * @param {Element} renderedParent The rendered parent (e.g. paragraph).
+ * @param {Element} sourceParent The source parent.
+ * @param {string} hyphen The hyphenation string to remove if present at the end of the text.
+ * @returns {{index: number; offsetAdjustment: number}} The index of the source text node and any offset adjustment needed.
+ */
+export declare function indexOfTextNodeForOverflow(node: Node, renderedParent: Element, sourceParent: Element, hyphen: string): {
+    index: number;
+    offsetAdjustment: number;
+};
 /**
  * Throughout, whitespace is defined as one of the characters
  *  "\t" TAB \u0009

@@ -3,6 +3,7 @@ import * as Paged from "../index.js";
 declare global {
     interface Window {
         Paged: typeof Paged;
+        PagedPolyfill: Previewer;
         PagedConfig?: PagedConfig;
     }
 }

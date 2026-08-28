@@ -38,6 +38,7 @@ export type RenderStep = IteratorResult<BreakToken | undefined, void> & {
 export interface RootColumnConfig {
     count: number;
     gap?: string;
+    fill?: "auto" | "balance";
     ruleColor?: string;
     ruleStyle?: string;
     ruleWidth?: string;
@@ -60,8 +61,17 @@ declare class Chunker {
     breakToken?: BreakToken;
     /** Selector strings from author CSS that declare multi-column formatting. */
     multicolSelectors: Set<string>;
+    /** Selectors declaring `column-span: all` (full-width rows). */
+    columnSpanSelectors: Set<string>;
     /** Root-level multicol configuration applied to every page wrapper. */
     rootColumns?: RootColumnConfig;
+    /**
+     * Root-level column configuration captured from author CSS by the
+     * Columns handler, which simultaneously strips the declarations from
+     * the sheet so they can never restyle the host document (the rendered
+     * page list must not become a browser multicol container).
+     */
+    rootColumnsFromCss?: RootColumnConfig;
     /**
      * Create a new Chunker instance.
      *
@@ -85,11 +95,13 @@ declare class Chunker {
      *
      * Sources, in order of precedence:
      * 1. `settings.rootColumns` ({ count: 2, ... }).
-     * 2. The computed style of the content element when it is an
+     * 2. Column declarations on `body`/`html` captured from author CSS by
+     *    the Columns handler (which strips them from the sheet so the host
+     *    document is never itself turned into a multicol container).
+     * 3. The computed style of the content element when it is an
      *    HTMLElement attached to the document.
-     * 3. The computed style of document.body (polyfill flow: author CSS
-     *    declares columns on body; the body itself is emptied but keeps its
-     *    declarations).
+     * 4. The computed style of document.body (legacy fallback for CSS the
+     *    polisher did not process).
      */
     detectRootColumns(content?: HTMLElement | DocumentFragment | string): RootColumnConfig | undefined;
     /**
@@ -220,9 +232,39 @@ declare class Chunker {
     /**
      * Waits for all fonts to load before rendering starts.
      *
+     * Every registered face is loaded explicitly, then `document.fonts.ready`
+     * is awaited as a browser-wide barrier. Because styles processed during
+     * loading can register further faces, the load/barrier cycle repeats
+     * until a pass finds nothing left unloaded (bounded by FONT_LOAD_PASSES).
+     * This keeps on-screen text breaking aligned with the fonts the PDF
+     * emitter later measures against.
+     *
      * @returns {Promise<string[]>} - A promise resolving to a list of font families loaded.
      */
     loadFonts(): Promise<string[]>;
+    /**
+     * Preloads every source image before pagination starts.
+     *
+     * Float placement and overflow detection read element geometry while
+     * content is appended — earlier than the per-page image waits run — so
+     * images must already have their final boxes by then. Loading the URLs
+     * up front warms the cache so cloned page images complete immediately.
+     *
+     * @param {DocumentFragment|Node} parsed - The parsed source content.
+     * @returns {Promise<void>} - Resolves when all images settled (loaded,
+     * failed, or timed out); failures only warn.
+     */
+    loadImages(parsed: DocumentFragment | Node): Promise<void>;
+    /**
+     * Awaits a single image's data, bounded by IMAGE_PRELOAD_TIMEOUT_MS so a
+     * hanging request cannot stall rendering forever. Also forces eager
+     * loading: clones of the node keep that attribute and never measure
+     * against an empty lazy box.
+     *
+     * @param {HTMLImageElement} img - The image to preload.
+     * @returns {Promise<void>} - Resolves on load, error, or timeout.
+     */
+    private preloadImage;
     /**
      * Cleans up and removes all rendered elements and templates.
      */

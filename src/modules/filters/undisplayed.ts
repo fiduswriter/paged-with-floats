@@ -93,7 +93,9 @@ class UndisplayedFilter extends Handler {
 		const styledElements = content.querySelectorAll("[style]") as NodeListOf<HTMLElement>;
 		for (let i = 0; i < styledElements.length; i++) {
 			const element = styledElements[i];
-			if (this.removable(element)) {
+			// Only an explicit inline `display: none` hides the element; any
+			// other style attribute must not mark it undisplayed.
+			if (element.style.display === "none") {
 				element.dataset.undisplayed = "undisplayed";
 			}
 		}

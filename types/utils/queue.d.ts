@@ -13,9 +13,6 @@ interface QueuedItemPromise {
     deferred?: undefined;
 }
 type QueueItem = QueuedItemTask | QueuedItemPromise;
-/**
- * Queue for handling tasks one at a time
- */
 declare class Queue {
     _q: QueueItem[];
     context: unknown;
@@ -24,6 +21,19 @@ declare class Queue {
     paused: boolean;
     defered: defer;
     constructor(context: unknown);
+    /**
+     * Schedules a callback on the next animation frame, with a timer
+     * fallback for environments that stop producing frames.
+     *
+     * Occluded or minimized windows pause requestAnimationFrame
+     * indefinitely; without the fallback, pagination would stall forever
+     * whenever the preview is not actually on screen. Whichever signal
+     * arrives first wins; the other is cancelled.
+     *
+     * @param {Function} cb - The callback to schedule.
+     * @returns {number} The animation frame handle.
+     */
+    private scheduleTick;
     /**
      * Add an item to the queue
      *

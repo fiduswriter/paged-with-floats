@@ -56,21 +56,55 @@ declare class Page {
     /**
      * Creates a wrapper element inside the page's content area.
      *
-     * When a root-level multicol configuration is present (via settings
-     * `rootColumns`), the wrapper becomes the fragmentainer: the browser
-     * fragments flow content into N visible columns and any content beyond
-     * the last column spills into an additional off-page column, which the
-     * layout stage detects as overflow.
+     * Single-column pages keep the classic structure: a plain wrapper
+     * between the template's float containers. Root-level multicol pages
+     * use a *flow host* instead: the float containers move inside it and N
+     * `.paged_column` boxes are built between them. Columns are cut and
+     * positioned by the layout engine rather than the browser's
+     * `column-count`, so measurement always matches the final rendering.
      *
      * @returns {HTMLElement} The wrapper element.
      */
     createWrapper(): HTMLDivElement;
+    /**
+     * Populates the flow host with explicit column boxes.
+     *
+     * Each column is a plain block sized to `calc((100% - (N-1)*gap) / N)`
+     * and laid out in a flex row; the engine fills them sequentially. The
+     * host keeps `height: inherit` so the outer content area (and the page
+     * float containers above it) fragment exactly as before.
+     *
+     * @param {HTMLDivElement} wrapper - The flow host.
+     * @param {Object} rootColumns - Root column configuration.
+     * @returns {void}
+     */
+    private buildManualColumns;
     /**
      * Sets the page index and updates relevant attributes and classes.
      *
      * @param {number} pgnum - The page index number (0-based).
      */
     index(pgnum: number): void;
+    /**
+     * Marks or unmarks this page as the one currently being laid out.
+     *
+     * While active, `content-visibility: visible` is forced so every
+     * geometry read during pagination sees real boxes — even when consumer
+     * CSS keeps off-screen pages skipped (e.g. demos injecting
+     * `content-visibility: auto`, which would otherwise make word rects,
+     * scrollWidth and friends read as placeholders for pages near the
+     * viewport threshold). The inline override is removed afterwards so
+     * author/demo rules apply again to the finished page.
+     *
+     * @param {boolean} active - Whether layout on this page is running.
+     */
+    setLayoutActive(active: boolean): void;
+    /**
+     * Drops cached sizing state that depended on skipped layout while the
+     * page was inactive (placeholder intrinsic size), forcing fresh
+     * measurement once contents are forced visible again.
+     */
+    private invalidateActiveSize;
     /**
      * Start to layout page
      *
@@ -111,6 +145,11 @@ declare class Page {
     onUnderflow(func: (token: BreakToken) => void): void;
     /**
      * Clears the wrapper and listeners, resetting the layout state.
+     *
+     * For manual-columns pages the flow host and its float containers are
+     * preserved (floats placed before layout must survive), while content
+     * and column rows are removed and the columns rebuilt. Single-column
+     * pages keep the classic full recreate.
      */
     clear(): void;
     /**

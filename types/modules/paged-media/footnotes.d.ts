@@ -25,6 +25,7 @@ declare class Footnotes extends Handler {
     footnotes: Record<string, FootnoteSelector>;
     needsLayout: Node[];
     overflow: HTMLElement[];
+    footnotesPlaced: number;
     /**
      * Creates an instance of Footnotes.
      * @param {object} chunker - The chunker instance handling content chunks.
@@ -91,6 +92,29 @@ declare class Footnotes extends Handler {
      * @param {Element} node - The container node to check visibility against.
      */
     findVisibleFootnotes(notes: NodeListOf<HTMLElement> | HTMLElement[], node: HTMLElement): void;
+    /**
+     * Sets the footnote area height on the page area, never below the
+     * reserve the layout engine recorded for this page
+     * (`data-paged-footnote-reserve`). While a page is being filled, the
+     * columns are laid out against the reserved height; letting the actual
+     * note content shrink the area back down would grow the columns again
+     * and then re-shrink them with every further extraction, spilling
+     * already-laid-out text.
+     *
+     * @param {HTMLElement} pageArea - The page's `.paged_area` element.
+     * @param {number} px - The content-derived height in px.
+     * @returns {void}
+     */
+    setFootnoteAreaHeight(pageArea: HTMLElement, px: number): void;
+    /**
+     * Releases the layout engine's footnote reserve at the end of the page:
+     * the area is sized to the notes it actually holds, so an over-estimate
+     * does not leave a reserved-but-empty band at the bottom of the page.
+     *
+     * @param {HTMLElement} pageArea - The page's `.paged_area` element.
+     * @returns {void}
+     */
+    releaseFootnoteReserve(pageArea: HTMLElement): void;
     /**
      * Recalculates the height of footnote content and adjusts page CSS variables
      * to ensure proper layout according to footnote policy and overflow.

@@ -83,6 +83,22 @@ declare class Previewer {
      */
     removeStyles(doc?: Document): Array<string | Record<string, string> | undefined>;
     /**
+     * Harvests stylesheets embedded in the content itself — `<style>`
+     * elements and stylesheet `<link>`s that live inside the body/fragment
+     * rather than the document head.
+     *
+     * Manual `Previewer` callers typically pass a fragment whose CSS is
+     * embedded in it (demos, editable previews). Without harvesting, that
+     * CSS never reaches the polisher: handlers never see the declarations
+     * (page floats go untagged, `@page` rules stay dead) and the raw rules
+     * apply globally once rendered. The elements are removed from the
+     * content and returned for polisher processing.
+     *
+     * @param {DocumentFragment|HTMLElement} content - The content to harvest from.
+     * @returns {Array} - Stylesheet hrefs / inline style objects, in document order.
+     */
+    removeContentStyles(content?: DocumentFragment | HTMLElement | string | null): Array<string | Record<string, string> | undefined>;
+    /**
      * Main method for rendering content into paginated preview.
      * Triggers hooks and events, applies stylesheets, chunks the content, and returns the flow result.
      *
