@@ -4,10 +4,6 @@ import json from "@rollup/plugin-json";
 import terser from "@rollup/plugin-terser";
 import typescript from "@rollup/plugin-typescript";
 import license from "rollup-plugin-license";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const pkg = require("./package.json");
 
 const plugins = [
 	typescript({
@@ -40,71 +36,40 @@ const plugins = [
 ];
 
 export default [
-	// browser-friendly UMD build
-	{
-		input: "./src/index.ts",
-		output: {
-			name: "Paged",
-			file: pkg.browser,
-			format: "umd",
-		},
-		plugins: plugins,
-	},
-
-	{
-		input: "./src/index.ts",
-		output: {
-			name: "PagedModule",
-			file: "./dist/paged.esm.js",
-			format: "es",
-		},
-		plugins: plugins,
-	},
-
+	// Polyfill bundle used by printHTML when paginating in a hidden iframe.
 	{
 		input: "./src/polyfill/polyfill.ts",
 		output: {
 			name: "PagedPolyfill",
 			file: "./dist/paged.polyfill.js",
 			format: "umd",
+			sourcemap: true,
 		},
 		plugins: plugins,
 	},
 
-	// print + PDF export APIs (ESM only; heavy deps stay out of the core)
+	// Public API: print + PDF export (ESM only).
+	// pages-to-pdf is external so consumers bring their own copy and the bundle
+	// stays small.
 	{
 		input: "./src/paged.pdf.ts",
+		external: ["pages-to-pdf"],
 		output: {
 			file: "./dist/paged.pdf.js",
 			format: "es",
+			sourcemap: true,
 		},
 		plugins: plugins,
 	},
 
-	// minified
-	{
-		input: "./src/index.ts",
-		output: {
-			name: "PagedModule",
-			file: "./dist/paged.min.js",
-			format: "umd",
-		},
-		plugins: [plugins, terser()],
-	},
-	{
-		input: "./src/polyfill/polyfill.ts",
-		output: {
-			name: "PagedPolyfill",
-			file: "./dist/paged.polyfill.min.js",
-			format: "umd",
-		},
-		plugins: [plugins, terser()],
-	},
+	// Minified public API.
 	{
 		input: "./src/paged.pdf.ts",
+		external: ["pages-to-pdf"],
 		output: {
 			file: "./dist/paged.pdf.min.js",
 			format: "es",
+			sourcemap: true,
 		},
 		plugins: [plugins, terser()],
 	},

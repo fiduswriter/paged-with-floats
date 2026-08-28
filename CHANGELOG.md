@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.9.0 (2026-08-28)
+
+### Breaking
+
+- **Public API reduced to three exports**: `printHTML`, `renderHTML`, and
+  `htmlToPDF`. The `Previewer`, `registerHandlers`, and other internal symbols
+  are no longer exported from the npm package.
+- **Removed the `/pdf` subpath export**. Consumers must import from the root:
+  ```ts
+  import { printHTML, renderHTML, htmlToPDF } from "paged-with-floats";
+  ```
+- **Dropped non-ESM public-API builds**. The package no longer ships CJS or
+  legacy browser bundles for the public API; `dist/paged.pdf.js` is ESM only.
+  The pagination polyfill is still provided as `dist/paged.polyfill.js` (UMD).
+- **`pages-to-pdf` is external** in the public-API bundle. Consumers of
+  `htmlToPDF`/`printHTML` bring their own copy of `pages-to-pdf`; the bundle
+  no longer embeds it.
+
+### Added
+
+- **`renderHTML(html, container, options)`**: a new helper that paginates a
+  document and renders the result visibly inside a supplied DOM container. It
+  is a convenience wrapper around `printHTML` with the new `renderTo` option.
+- **`printHTML` gained a `renderTo` option**. When set, the pagination iframe
+  is appended visibly to the given element instead of being hidden, making it
+  easy to build live previews.
+- **Source maps** are now emitted for the public-API bundle and the type
+  declarations.
+
+### Changed
+
+- **Type declarations restricted to the public API**. The published `types/`
+  folder now only contains declarations for `paged.pdf.ts` and `print.ts`;
+  internal module types are no longer shipped.
+- **NPM `files` whitelist tightened** to include only the public-API bundles,
+  polyfill bundle, bundled fonts, public type files, source maps, and license
+  files.
+- **README rewritten** to document the new root-only public API.
+
 ## 0.8.0 (2026-08-28)
 
 ### Added

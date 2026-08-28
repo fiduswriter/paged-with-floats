@@ -4,7 +4,7 @@
  * Mirrors the API documented in the vivliostyle-print README:
  *
  * ```ts
- * import { printHTML } from "paged-with-floats/pdf";
+ * import { printHTML } from "paged-with-floats";
  *
  * printHTML(htmlDoc, {
  *     title: "my printed page",
@@ -45,6 +45,13 @@ export interface PrintHTMLConfig {
      * as emitPdfFromPagedWindow; remove it yourself afterwards.
      */
     keepIframe?: boolean;
+    /**
+     * When provided, the paginated iframe is rendered visibly inside this
+     * element instead of being hidden. The iframe is sized to fill the
+     * container so full pages are visible. This implies `keepIframe: true`
+     * and overrides the default hidden styles.
+     */
+    renderTo?: HTMLElement;
 }
 declare global {
     interface Window {
@@ -55,3 +62,4 @@ declare global {
     }
 }
 export declare function printHTML(html: string, config?: PrintHTMLConfig): Promise<HTMLIFrameElement>;
+//# sourceMappingURL=print.d.ts.map

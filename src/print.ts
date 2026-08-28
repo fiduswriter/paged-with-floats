@@ -4,7 +4,7 @@
  * Mirrors the API documented in the vivliostyle-print README:
  *
  * ```ts
- * import { printHTML } from "paged-with-floats/pdf";
+ * import { printHTML } from "paged-with-floats";
  *
  * printHTML(htmlDoc, {
  *     title: "my printed page",
@@ -46,6 +46,13 @@ export interface PrintHTMLConfig {
 	 * as emitPdfFromPagedWindow; remove it yourself afterwards.
 	 */
 	keepIframe?: boolean;
+	/**
+	 * When provided, the paginated iframe is rendered visibly inside this
+	 * element instead of being hidden. The iframe is sized to fill the
+	 * container so full pages are visible. This implies `keepIframe: true`
+	 * and overrides the default hidden styles.
+	 */
+	renderTo?: HTMLElement;
 }
 
 declare global {
@@ -75,13 +82,24 @@ export function printHTML(
 ): Promise<HTMLIFrameElement> {
 	return new Promise<HTMLIFrameElement>((resolve) => {
 		const iframe = document.createElement("iframe");
-		iframe.style.position = "fixed";
-		iframe.style.right = "0";
-		iframe.style.bottom = "0";
-		iframe.style.width = "1px";
-		iframe.style.height = "1px";
-		iframe.style.opacity = "0";
-		iframe.style.border = "0";
+		const renderTo = config.renderTo;
+		if (renderTo) {
+			// Visible preview mode: fill the supplied container so full pages
+			// can be seen.
+			iframe.style.width = "100%";
+			iframe.style.minHeight = "80vh";
+			iframe.style.border = "0";
+			iframe.style.display = "block";
+		} else {
+			// Hidden print mode: keep the iframe out of sight.
+			iframe.style.position = "fixed";
+			iframe.style.right = "0";
+			iframe.style.bottom = "0";
+			iframe.style.width = "1px";
+			iframe.style.height = "1px";
+			iframe.style.opacity = "0";
+			iframe.style.border = "0";
+		}
 
 		let settled = false;
 
@@ -180,7 +198,7 @@ window.PagedConfig = {
 						win.print();
 						resolve(iframe);
 					}
-					if (!config.keepIframe) {
+					if (!config.keepIframe && !renderTo) {
 						window.setTimeout(() => iframe.remove(), 0);
 					}
 				} catch (error) {
@@ -189,6 +207,10 @@ window.PagedConfig = {
 			}
 		}, 100);
 
-		document.body.appendChild(iframe);
+		if (renderTo) {
+			renderTo.appendChild(iframe);
+		} else {
+			document.body.appendChild(iframe);
+		}
 	});
 }

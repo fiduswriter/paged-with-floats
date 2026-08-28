@@ -134,50 +134,56 @@ at the cost of UI responsiveness during rendering.
 
 ## Print & PDF export
 
-Two print/PDF APIs ship as a separate bundle
-(`dist/paged.pdf.js`, `import ... from "paged-with-floats/pdf"`):
+The public API is published as the root export of the npm package and
+exposes three helpers:
 
 ```ts
-import {
-	printHTML,
-	emitPdfFromPagedWindow,
-	htmlToPDF,
-} from "paged-with-floats/pdf";
+import { printHTML, renderHTML, htmlToPDF } from "paged-with-floats";
 
-// 1. paginate html in a hidden iframe.
+// 1. Paginate HTML in a hidden iframe, then print or process it.
 printHTML(htmlDoc, {
 	title: "my printed page",
-	keepIframe: true, // needed when an async consumer uses the window
 	printCallback: (iframeWin) => iframeWin.print(), // optional
 	errorCallback: (message) => alert(message),      // optional
 });
 
-// 2. emitPdfFromPagedWindow produces a real vector PDF with
-//    embedded/subsetted fonts, link annotations, outline and metadata
-//    from the paginated window:
-printHTML(htmlDoc, {
-	title: "My document",
-	keepIframe: true,
-	printCallback: (win) => {
-		emitPdfFromPagedWindow(win, console.log, {
-			sourceHtml: htmlDoc,
-			metadata: { title: "My document" },
-		}).then((bytes) => download(new Blob([bytes])));
-	},
-});
+// 2. Render the paginated result visibly inside a container on the page:
+await renderHTML(
+	htmlDoc,
+	document.getElementById("preview-container"),
+	{ title: "my preview", errorCallback: (message) => alert(message) }
+);
 
-// 3. or both steps in one call:
+// 3. Paginate and emit a real vector PDF in one call:
 const bytes = await htmlToPDF(htmlDoc, {
 	title: "My document",
 });
 download(new Blob([bytes], { type: "application/pdf" }));
 ```
 
-PDF emission is handled by the separate
+For full control, paginate with `printHTML` (use `keepIframe: true`) and
+pass the iframe window to `emitPdfFromWindow` from the separate
 [`pages-to-pdf`](https://git.fiduswriter.org/fiduswriter/pages-to-pdf)
-library (LGPL-3.0-or-later). `paged-with-floats/pdf` re-exports its
-`htmlToPDF` and `printHTML` helpers and wraps `pages-to-pdf`'s generic
-`emitPdfFromWindow()` with the paged-with-floats backend preset.
+library (LGPL-3.0-or-later):
+
+```ts
+import { printHTML } from "paged-with-floats";
+import { emitPdfFromWindow } from "pages-to-pdf";
+
+const iframe = await printHTML(htmlDoc, {
+	title: "My document",
+	keepIframe: true,
+	printCallback: (win) => {
+		emitPdfFromWindow(win, console.log, {
+			sourceHtml: htmlDoc,
+			metadata: { title: "My document" },
+		}).then((bytes) => download(new Blob([bytes])));
+	},
+});
+```
+
+`paged-with-floats` configures `pages-to-pdf` with the paged-with-floats
+backend preset, so no explicit backend is required.
 
 Fallback fonts for documents without `@font-face` rules are bundled in
 `assets/fonts/` and copied to `dist/fonts/` at build time; exports that cannot
@@ -187,9 +193,12 @@ multicol, page floats and footnotes.
 
 ## TypeScript
 
-The library is written in strict TypeScript and ships type declarations;
-`import { Previewer } from "paged-with-floats"` is fully typed, including
-the handler/hook APIs used for extensions.
+The library is written in strict TypeScript and ships type declarations for
+the public API:
+
+```ts
+import { printHTML, htmlToPDF, type PrintHTMLConfig } from "paged-with-floats";
+```
 
 ## NPM Module
 ```sh
@@ -197,17 +206,34 @@ $ npm install paged-with-floats
 ```
 
 ```js
-import { Previewer } from 'paged-with-floats';
+import { htmlToPDF } from "paged-with-floats";
 
-let paged = new Previewer();
-let flow = paged.preview(DOMContent, ["path/to/css/file.css"], document.body).then((flow) => {
-	console.log("Rendered", flow.total, "pages.");
-})
+const bytes = await htmlToPDF(`<!doctype html>
+<html>
+  <head><style>@page { size: A4; }</style></head>
+  <body><p>Hello, paged media!</p></body>
+</html>`, {
+  title: "Hello",
+});
+
+// Download the PDF.
+const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+const a = document.createElement("a");
+a.href = url;
+a.download = "hello.pdf";
+a.click();
+URL.revokeObjectURL(url);
 ```
 
 ## Polyfill
 
-Add the the `paged.polyfill.js` script to replace all `@page` css and render the html page with the Paged Media styles applied:
+`printHTML` and `htmlToPDF` load the polyfill bundle automatically inside the
+pagination iframe, so most consumers do not need to reference it directly.
+
+To paginate a whole page in place (for example to add custom handlers or to
+drive the layout from a plain HTML page), add the `paged.polyfill.js` script.
+It replaces all `@page` CSS and renders the page with Paged Media styles
+applied:
 
 ```html
 <script src="https://unpkg.com/paged-with-floats/dist/paged.polyfill.js"></script>
@@ -253,9 +279,12 @@ Converts `@page` css to classes, and applies counters and content.
 
 ## Module
 
-Modules are groups of handlers for that apply the layout and styles of a CSS module, such as Generated Content or Page Floats.
+Modules are groups of handlers that apply the layout and styles of a CSS
+module, such as Generated Content or Page Floats.
 
-New handlers can be registered from `import { registerHandlers } from 'paged-with-floats'` or by calling `Paged.registerHandlers` on an html page.
+When the polyfill bundle (`dist/paged.polyfill.js`) runs it exposes a global
+`Paged` object; custom handlers can be registered on the page that loads the
+polyfill:
 
 ```html
 <script src="https://unpkg.com/paged-with-floats/dist/paged.polyfill.js"></script>

@@ -3,11 +3,10 @@
 	"compilerOptions": {
 		"noEmit": false,
 		"declaration": true,
-		"declarationMap": false,
+		"declarationMap": true,
 		"emitDeclarationOnly": true,
 		"outDir": "./types",
 		"rootDir": "./src"
 	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["src/**/*.test.ts"]
+	"include": ["src/paged.pdf.ts", "src/print.ts"]
 }

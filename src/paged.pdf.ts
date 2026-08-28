@@ -1,20 +1,20 @@
 /**
- * Print + PDF export entry point.
+ * Public paged-with-floats API.
  *
- * Three APIs:
+ * `paged-with-floats` exposes three helpers:
  *
  * 1. `printHTML(html, config)` — paginates `html` with paged-with-floats inside
  *    a hidden iframe and hands the window to `printCallback` (default: browser
  *    print dialog).
  *
- * 2. `emitPdfFromPagedWindow(win)` — walks the paginated output in that window
- *    and re-renders it as a real vector PDF using pages-to-pdf.
+ * 2. `renderHTML(html, container, options)` — paginates `html` and renders the
+ *    result visibly inside `container`. No print dialog is opened.
  *
- * 3. `htmlToPDF(html, options)` — the two above composed into a single call:
- *    paginate, emit, clean up, resolve with the PDF bytes.
+ * 3. `htmlToPDF(html, options)` — paginate and emit a real vector PDF in one
+ *    call, with iframe cleanup handled internally.
  *
  * ```ts
- * import { htmlToPDF } from "paged-with-floats/pdf";
+ * import { htmlToPDF } from "paged-with-floats";
  *
  * const bytes = await htmlToPDF(htmlDoc, {
  *     title: "My document",
@@ -37,19 +37,44 @@ export {
 } from "./print.js";
 
 /**
- * Emit a PDF from a window paginated by paged-with-floats.
- *
- * This is a convenience alias for
- * `emitPdfFromWindow(win, { backend: PAGED_WITH_FLOATS_BACKEND, ...options })`.
+ * Options for {@link renderHTML}: pagination configuration for a visible
+ * preview.
  */
-export function emitPdfFromPagedWindow(
-	win: Window,
-	onProgress?: (message: string) => void,
-	options?: Omit<EmitOptions, "backend">,
-): Promise<Uint8Array> {
-	return emitPdfFromWindow(win, onProgress, {
-		...options,
-		backend: PAGED_WITH_FLOATS_BACKEND,
+export interface RenderHTMLOptions {
+	/** Applied to the paginated iframe document. */
+	title?: string;
+	/** URL of the paged-with-floats polyfill bundle for the frame. */
+	polyfillURL?: string;
+	/** Extra Previewer settings (textMeasurement etc.). */
+	settings?: Record<string, unknown>;
+	/** Called with a message when something goes wrong. */
+	errorCallback?: (message: string) => void;
+}
+
+/**
+ * Paginates `html` with paged-with-floats and renders the result visibly
+ * inside `container`. No print dialog is opened and the iframe stays in the
+ * supplied container.
+ *
+ * @param html - A complete HTML document string.
+ * @param container - The element that will hold the pagination iframe.
+ * @param options - Pagination options.
+ * @returns The pagination iframe.
+ */
+export async function renderHTML(
+	html: string,
+	container: HTMLElement,
+	options: RenderHTMLOptions = {},
+): Promise<HTMLIFrameElement> {
+	return printHTML(html, {
+		title: options.title,
+		polyfillURL: options.polyfillURL,
+		settings: options.settings,
+		renderTo: container,
+		errorCallback: options.errorCallback,
+		printCallback: () => {
+			// Visible preview: nothing to print.
+		},
 	});
 }
 
@@ -80,8 +105,7 @@ export interface HtmlToPDFOptions {
 
 /**
  * Paginates `html` with paged-with-floats and returns real vector PDF bytes —
- * no print dialog involved. Composition of `printHTML` and
- * `emitPdfFromPagedWindow`, with iframe cleanup handled internally.
+ * no print dialog involved.
  *
  * @param html - A complete HTML document string.
  * @param options - Pagination and emission options.
