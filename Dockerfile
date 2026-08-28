@@ -19,10 +19,10 @@ RUN apt-get update && \
 		rm -rf /var/lib/apt/lists/*
 
 # Font rendering configuration (aliases + hinting policy).
-# Microsoft core fonts are intentionally NOT installed: spec fixtures
-# referencing Times New Roman/Arial/Courier New are aliased to the
-# metric-compatible Liberation families (installed below) via
-# docker-font.conf, so baselines stay reproducible with free fonts only.
+# The MS core fonts referenced by spec fixtures (Times New Roman, Arial,
+# Courier New, ...) are installed below: DOM spec expectations such as page
+# counts were calibrated against their metrics, and metric-compatible
+# substitutes shift line breaks and pagination.
 COPY docker-font.conf /etc/fonts/local.conf
 
 
@@ -33,6 +33,14 @@ RUN apt-get update && apt-get install -y wget --no-install-recommends \
 		&& rm -rf /var/lib/apt/lists/* \
 		&& apt-get purge --auto-remove -y curl \
 		&& rm -rf /src/*.deb
+
+# MS core fonts (EULA accepted non-interactively; the fonts are freely
+# redistributable per their original license).
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
+		apt-get update && \
+		apt-get install -y ttf-mscorefonts-installer && \
+		rm -rf /var/lib/apt/lists/* && \
+		fc-cache -f
 
 # helps prevent zombie chrome processes.
 ADD https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64 /usr/local/bin/dumb-init

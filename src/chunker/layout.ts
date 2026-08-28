@@ -2892,6 +2892,9 @@ class Layout {
 			if (!(child instanceof HTMLElement)) {
 				return true;
 			}
+			if (child.dataset.undisplayed) {
+				return false;
+			}
 			return (
 				!child.classList.contains("paged_float_top") &&
 				!child.classList.contains("paged_float_bottom") &&
@@ -3149,9 +3152,12 @@ class Layout {
 			// iteration re-measure once, lazily.
 			this.invalidateBounds();
 
-			// Check whether layout has content yet.
+			// Check whether layout has content yet. Undisplayed nodes (e.g.
+			// running headers parked in the flow) render nothing and must not
+			// let forced breaks fire before real content exists.
 			if (!hasRenderedContent) {
-				hasRenderedContent = hasContent(node!);
+				hasRenderedContent =
+					hasContent(node!) && !(node as HTMLElement).dataset?.undisplayed;
 			}
 
 			// Skip to the next node if a deep clone was rendered.

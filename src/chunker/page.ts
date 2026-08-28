@@ -28,6 +28,8 @@ class Page {
 	floatBottomArea?: Element | null;
 	startToken?: BreakToken;
 	endToken?: BreakToken;
+	/** Set when a page made zero layout progress; the chunker may drop it. */
+	zeroProgress?: boolean;
 	layoutMethod?: Layout;
 	position?: number;
 	id?: string;
@@ -357,6 +359,7 @@ class Page {
 		if (breakToken && newBreakToken && breakToken.equals(newBreakToken)) {
 			// Zero progress this page: pagination would loop forever, so it
 			// stops here. Diagnosable via `window.__PAGED_DEBUG = { stops: true }`.
+			this.zeroProgress = true;
 			const debug = (globalThis as unknown as {
 				__PAGED_DEBUG?: { stops?: boolean };
 			}).__PAGED_DEBUG;
@@ -374,11 +377,53 @@ class Page {
 			return;
 		}
 
+		if (
+			!newBreakToken &&
+			breakToken &&
+			breakToken.isFinished() &&
+			this.isBlank()
+		) {
+			// The incoming token was already finished, so nothing could be
+			// laid out here; this page exists only because pagination needs a
+			// place to stop. Treated like a zero-progress page so the chunker
+			// can drop it.
+			this.zeroProgress = true;
+		}
+
 		this.addListeners(contents);
 
 		this.endToken = newBreakToken;
 
 		return newBreakToken;
+	}
+
+	/**
+	 * Whether the page's flow wrapper holds no displayable content.
+	 *
+	 * Float scaffolding (top/bottom float containers, spacers) and
+	 * undisplayed nodes don't count as content.
+	 *
+	 * @returns {boolean} True when the flow wrapper is empty or holds only
+	 *   invisible scaffolding.
+	 */
+	isBlank(): boolean {
+		const wrapper = this.wrapper;
+		if (!wrapper) {
+			return true;
+		}
+		return !Array.from(wrapper.children).some((child) => {
+			if (!(child instanceof HTMLElement)) {
+				return true;
+			}
+			if (child.dataset.undisplayed) {
+				return false;
+			}
+			return (
+				!child.classList.contains("paged_float_top") &&
+				!child.classList.contains("paged_float_bottom") &&
+				!child.classList.contains("paged_float_spacer")
+			);
+		});
 	}
 
 	/**

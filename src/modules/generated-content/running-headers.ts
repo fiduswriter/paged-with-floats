@@ -137,6 +137,10 @@ class RunningHeaders extends Handler {
 			if (set.identifier === "running") {
 				for (let header of selected) {
 					header.style.display = "none";
+					// Mark them undisplayed so the layout walk neither counts
+					// them as rendered content nor anchors page-name break
+					// decisions on them.
+					header.dataset.undisplayed = "undisplayed";
 				}
 			}
 		}

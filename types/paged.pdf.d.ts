@@ -1,6 +1,37 @@
-import { type EmitMetadata, type EmitOptions } from "./pdf/pdf-emitter.js";
+/**
+ * Print + PDF export entry point.
+ *
+ * Three APIs:
+ *
+ * 1. `printHTML(html, config)` — paginates `html` with paged-with-floats inside
+ *    a hidden iframe and hands the window to `printCallback` (default: browser
+ *    print dialog).
+ *
+ * 2. `emitPdfFromPagedWindow(win)` — walks the paginated output in that window
+ *    and re-renders it as a real vector PDF using pages-to-pdf.
+ *
+ * 3. `htmlToPDF(html, options)` — the two above composed into a single call:
+ *    paginate, emit, clean up, resolve with the PDF bytes.
+ *
+ * ```ts
+ * import { htmlToPDF } from "paged-with-floats/pdf";
+ *
+ * const bytes = await htmlToPDF(htmlDoc, {
+ *     title: "My document",
+ *     metadata: { title: "My document" },
+ * });
+ * download(new Blob([bytes], { type: "application/pdf" }));
+ * ```
+ */
+import { type EmitMetadata, type EmitOptions } from "pages-to-pdf";
 export { printHTML, type PrintHTMLConfig, } from "./print.js";
-export { emitPdfFromPagedWindow, } from "./pdf/pdf-emitter.js";
+/**
+ * Emit a PDF from a window paginated by paged-with-floats.
+ *
+ * This is a convenience alias for
+ * `emitPdfFromWindow(win, { backend: PAGED_WITH_FLOATS_BACKEND, ...options })`.
+ */
+export declare function emitPdfFromPagedWindow(win: Window, onProgress?: (message: string) => void, options?: Omit<EmitOptions, "backend">): Promise<Uint8Array>;
 /**
  * Options for {@link htmlToPDF}: pagination/print configuration combined
  * with the PDF emission extras.
@@ -21,7 +52,7 @@ export interface HtmlToPDFOptions {
     /** Where the WOFF2 decoder wasm lives (string URL or raw bytes). */
     woff2WasmUrl?: string | ArrayBuffer;
     /** Additional files to attach to the PDF. */
-    attachments?: import("./pdf/pdf-emitter.js").EmitAttachment[];
+    attachments?: import("pages-to-pdf").EmitAttachment[];
     /** Print-level extras passed through to the emitter. */
     printOptions?: EmitOptions["printOptions"];
 }

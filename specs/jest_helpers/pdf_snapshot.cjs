@@ -66,4 +66,8 @@ function toMatchPDFSnapshot(received, page = 1) {
 	return toMatchImageSnapshot.apply(this, [pdfImage, config]);
 }
 
+// Attach the availability flag to the exported matcher: the assignment
+// below replaces module.exports, so the flag must be set on the function
+// itself for `const { PDF_SNAPSHOTS_AVAILABLE } = require(...)` to work.
+toMatchPDFSnapshot.PDF_SNAPSHOTS_AVAILABLE = PDF_SNAPSHOTS_AVAILABLE;
 module.exports = toMatchPDFSnapshot;

@@ -18,7 +18,11 @@ const plugins = [
 		extensions: [".cjs", ".mjs", ".js"],
 	}),
 	commonjs({
-		include: "node_modules/**",
+		include: [
+			"node_modules/**",
+			"../pages-to-pdf/node_modules/**"
+		],
+		transformMixedEsModules: true
 	}),
 	json(),
 	license({

@@ -839,12 +839,27 @@ export function needsPageBreak(
 	if ((node as HTMLElement).dataset && (node as HTMLElement).dataset.undisplayed) {
 		return false;
 	}
-	let previousSignificantNodePage = (previousSignificantNode as HTMLElement)
-		.dataset
-		? (previousSignificantNode as HTMLElement).dataset.page
+
+	// Undisplayed nodes occupy no space on any page, so they cannot anchor a
+	// page-name comparison; walk back past them to the previous displayed
+	// node (or none).
+	let previous: Node | undefined = previousSignificantNode;
+	while (
+		previous &&
+		(previous as HTMLElement).dataset &&
+		(previous as HTMLElement).dataset.undisplayed
+	) {
+		previous = nodeBefore(previous);
+	}
+	if (!previous) {
+		return false;
+	}
+
+	let previousSignificantNodePage = (previous as HTMLElement).dataset
+		? (previous as HTMLElement).dataset.page
 		: undefined;
 	if (typeof previousSignificantNodePage === "undefined") {
-		const nodeWithNamedPage = getNodeWithNamedPage(previousSignificantNode);
+		const nodeWithNamedPage = getNodeWithNamedPage(previous);
 		if (nodeWithNamedPage) {
 			previousSignificantNodePage = nodeWithNamedPage.dataset.page;
 		}
@@ -855,10 +870,15 @@ export function needsPageBreak(
 	if (typeof currentNodePage === "undefined") {
 		const nodeWithNamedPage = getNodeWithNamedPage(
 			node,
-			previousSignificantNode,
+			previous,
 		);
 		if (nodeWithNamedPage) {
 			currentNodePage = nodeWithNamedPage.dataset.page;
+		} else if (typeof nodeWithNamedPage === "undefined") {
+			// The upward search reached the previous significant node, so the
+			// current node is its descendant and belongs to the same page
+			// group; a page break between them would be spurious.
+			return false;
 		}
 	}
 	return currentNodePage !== previousSignificantNodePage;

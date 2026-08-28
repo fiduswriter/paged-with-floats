@@ -831,6 +831,15 @@ class Chunker {
 				prevPage as unknown as Page,
 			);
 
+			if (!breakToken && page.zeroProgress && page.isBlank()) {
+				// Pagination stopped because no further progress was possible
+				// (e.g. the content cannot fit anywhere). The page absorbed
+				// nothing displayable, so drop it instead of emitting an empty
+				// trailing page.
+				this.removePages(this.pages.indexOf(page));
+				break;
+			}
+
 			await this.hooks.afterPageLayout.trigger(
 				page.element!,
 				page,

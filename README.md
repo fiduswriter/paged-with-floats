@@ -144,7 +144,7 @@ import {
 	htmlToPDF,
 } from "paged-with-floats/pdf";
 
-// 1. vivliostyle-print-compatible: paginate html in a hidden iframe.
+// 1. paginate html in a hidden iframe.
 printHTML(htmlDoc, {
 	title: "my printed page",
 	keepIframe: true, // needed when an async consumer uses the window
@@ -173,14 +173,17 @@ const bytes = await htmlToPDF(htmlDoc, {
 download(new Blob([bytes], { type: "application/pdf" }));
 ```
 
-The PDF emitter is derived from
-[vivliostyle-pdf](https://github.com/fiduswriter/vivliostyle-pdf)
-(LGPL-3.0-or-later, same author). Fallback fonts for documents without
-`@font-face` rules are bundled in `assets/fonts/` and copied to
-`dist/fonts/` at build time; exports that cannot load them proceed without
-those fallbacks. Remote images require CORS-safe URLs. See
-`examples/multicol-floats.html` for a print-ready demo combining multicol,
-page floats and footnotes.
+PDF emission is handled by the separate
+[`pages-to-pdf`](https://git.fiduswriter.org/fiduswriter/pages-to-pdf)
+library (LGPL-3.0-or-later). `paged-with-floats/pdf` re-exports its
+`htmlToPDF` and `printHTML` helpers and wraps `pages-to-pdf`'s generic
+`emitPdfFromWindow()` with the paged-with-floats backend preset.
+
+Fallback fonts for documents without `@font-face` rules are bundled in
+`assets/fonts/` and copied to `dist/fonts/` at build time; exports that cannot
+load them proceed without those fallbacks. Remote images require CORS-safe
+URLs. See `examples/multicol-floats.html` for a print-ready demo combining
+multicol, page floats and footnotes.
 
 ## TypeScript
 
