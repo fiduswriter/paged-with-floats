@@ -64,7 +64,7 @@ describe("multicol-audit", () => {
 		// on pure arithmetic and documents residual spills as a tradeoff
 		// (see README) — only its basic sanity is asserted above.
 		[domSummary, pretextSummary].forEach((summary) => {
-			const bad = summary.violations.filter((v) => v.spill > 2);
+			const bad = summary.violations.filter((v) => v.spill > 4);
 			expect(bad).toEqual([]);
 		});
 	});

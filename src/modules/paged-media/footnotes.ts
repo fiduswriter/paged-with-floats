@@ -36,6 +36,7 @@ class Footnotes extends Handler {
 	footnotes: Record<string, FootnoteSelector>;
 	needsLayout: Node[];
 	overflow: HTMLElement[];
+	footnotesPlaced: number;
 
 	/**
 	 * Creates an instance of Footnotes.
@@ -63,6 +64,17 @@ class Footnotes extends Handler {
 		 * @type {Array<Element>}
 		 */
 		this.overflow = [];
+
+		/**
+		 * Number of footnote markers placed on pages completed so far. Seeded
+		 * onto each page as `--paged-footnotes-count` so the footnote and
+		 * footnote-marker counters continue across page boundaries: Chromium
+		 * does not carry a counter scope into page subtrees appended after
+		 * the pages container was first rendered, so without the seed every
+		 * page would restart its footnote numbering at 1.
+		 * @type {number}
+		 */
+		this.footnotesPlaced = 0;
 	}
 
 	/**
@@ -301,6 +313,62 @@ class Footnotes extends Handler {
 	}
 
 	/**
+	 * Sets the footnote area height on the page area, never below the
+	 * reserve the layout engine recorded for this page
+	 * (`data-paged-footnote-reserve`). While a page is being filled, the
+	 * columns are laid out against the reserved height; letting the actual
+	 * note content shrink the area back down would grow the columns again
+	 * and then re-shrink them with every further extraction, spilling
+	 * already-laid-out text.
+	 *
+	 * @param {HTMLElement} pageArea - The page's `.paged_area` element.
+	 * @param {number} px - The content-derived height in px.
+	 * @returns {void}
+	 */
+	setFootnoteAreaHeight(pageArea: HTMLElement, px: number) {
+		const reserve = parseFloat(pageArea.dataset.pagedFootnoteReserve || "");
+		const value = Number.isFinite(reserve) ? Math.max(px, reserve) : px;
+		pageArea.style.setProperty("--paged-footnotes-height", `${value}px`);
+	}
+
+	/**
+	 * Releases the layout engine's footnote reserve at the end of the page:
+	 * the area is sized to the notes it actually holds, so an over-estimate
+	 * does not leave a reserved-but-empty band at the bottom of the page.
+	 *
+	 * @param {HTMLElement} pageArea - The page's `.paged_area` element.
+	 * @returns {void}
+	 */
+	releaseFootnoteReserve(pageArea: HTMLElement) {
+		if (pageArea.dataset.pagedFootnoteReserve === undefined) {
+			return;
+		}
+		delete pageArea.dataset.pagedFootnoteReserve;
+		const noteContent = pageArea.querySelector(
+			".paged_footnote_content",
+		) as HTMLElement | null;
+		if (!noteContent) {
+			return;
+		}
+		const height = noteContent.scrollHeight;
+		const total =
+			this.marginsHeight(noteContent) +
+			this.paddingHeight(noteContent) +
+			this.borderHeight(noteContent);
+		const final = Math.max(0, height + total);
+		const current =
+			parseFloat(
+				pageArea.style.getPropertyValue("--paged-footnotes-height"),
+			) || 0;
+		if (final < current) {
+			pageArea.style.setProperty(
+				"--paged-footnotes-height",
+				`${final}px`,
+			);
+		}
+	}
+
+	/**
 	 * Recalculates the height of footnote content and adjusts page CSS variables
 	 * to ensure proper layout according to footnote policy and overflow.
 	 *
@@ -392,7 +460,7 @@ class Footnotes extends Handler {
 			node.remove();
 		} else if (!hasNotes && needsNoteCall && total > noteDelta) {
 			// No space to add even the footnote area
-			pageArea.style.setProperty("--paged-footnotes-height", "0px");
+			this.setFootnoteAreaHeight(pageArea, 0);
 			// Add a wrapper as this div is removed later
 			let wrapperDiv = document.createElement("div");
 			wrapperDiv.appendChild(node);
@@ -400,21 +468,21 @@ class Footnotes extends Handler {
 			this.needsLayout.push(wrapperDiv);
 		} else if (!needsNoteCall) {
 			// Call was previously added, force adding footnote
-			pageArea.style.setProperty(
-				"--paged-footnotes-height",
-				`${height + total}px`,
+			this.setFootnoteAreaHeight(
+				pageArea,
+				height + noteContentMargins + noteContentBorders,
 			);
 		} else if (noteCallPosition < noteAreaBounds.top - contentDelta) {
 			// the current note content will fit without pushing the call to the next page
-			pageArea.style.setProperty(
-				"--paged-footnotes-height",
-				`${height + noteContentMargins + noteContentBorders}px`,
+			this.setFootnoteAreaHeight(
+				pageArea,
+				height + noteContentMargins + noteContentBorders,
 			);
 		} else if (notePolicyDelta > 0) {
 			// set height to just before note call
-			pageArea.style.setProperty(
-				"--paged-footnotes-height",
-				`${noteAreaBounds.height + notePolicyDelta}px`,
+			this.setFootnoteAreaHeight(
+				pageArea,
+				noteAreaBounds.height + notePolicyDelta,
 			);
 			let noteInnerContent = noteContent.querySelector(
 				".paged_footnote_inner_content",
@@ -473,6 +541,13 @@ class Footnotes extends Handler {
 
 		// Add marker
 		(node as HTMLElement).dataset.footnoteMarker = (node as HTMLElement).dataset.ref;
+
+		// A marker here means the footnote counter increments once (split
+		// continuations carry data-split-from and do not increment), so the
+		// running seed for later pages advances with it.
+		if (!(node as HTMLElement).dataset.splitFrom) {
+			this.footnotesPlaced += 1;
+		}
 
 		// Add Id
 		(node as HTMLElement).id = `note-${(node as HTMLElement).dataset.ref}`;
@@ -678,6 +753,11 @@ class Footnotes extends Handler {
 			}
 		}
 		noteInnerContent.style.height = "auto";
+
+		// The page is done: size the area to the notes it actually holds,
+		// releasing whatever the layout engine over-reserved. Measured after
+		// the inner content's height is released so scrollHeight is natural.
+		this.releaseFootnoteReserve(pageArea);
 	}
 
 	/**
@@ -705,6 +785,13 @@ class Footnotes extends Handler {
 	 * @returns {void}
 	 */
 	beforePageLayout(page: FootnotePage) {
+		// Seed this page's footnote counter with the markers placed on
+		// earlier pages (see footnotesPlaced).
+		page.element.style.setProperty(
+			"--paged-footnotes-count",
+			String(this.footnotesPlaced),
+		);
+
 		while (this.needsLayout.length) {
 			let fragment = this.needsLayout.shift();
 
@@ -743,6 +830,12 @@ class Footnotes extends Handler {
 			);
 			if (call) {
 				note.remove();
+				// The note leaves this page's counter scope; it counts
+				// again when it is reinserted on the next page (split
+				// continuations never incremented and stay uncounted).
+				if (!note.dataset.splitFrom) {
+					this.footnotesPlaced -= 1;
+				}
 				this.overflow.push(note);
 			}
 		}
@@ -774,7 +867,20 @@ class Footnotes extends Handler {
 
 		if (this.overflow.length) {
 			this.overflow.forEach((item) => {
+				// The note may have re-landed through moveFootnote while
+				// this stale overflow copy was already queued; keep one
+				// copy or the area renders an empty duplicate marker.
+				const existing = notesInnerContent.querySelector(
+					`[data-ref="${item.dataset.ref}"]`,
+				);
+				if (existing && existing !== item) {
+					item.remove();
+					return;
+				}
 				notesInnerContent.appendChild(item);
+				if (!item.dataset.splitFrom) {
+					this.footnotesPlaced += 1;
+				}
 				let call = rendered.querySelector(
 					`[data-ref="${item.dataset["ref"]}"]`,
 				);

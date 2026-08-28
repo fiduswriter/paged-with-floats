@@ -4,6 +4,7 @@ import * as Paged from "../index.js";
 declare global {
 	interface Window {
 		Paged: typeof Paged;
+		PagedPolyfill: Previewer;
 		PagedConfig?: PagedConfig;
 	}
 }
@@ -23,6 +24,8 @@ export interface PagedConfig {
  * Useful for debugging or for external scripts that want to access the API.
  */
 window.Paged = Paged;
+
+
 
 /**
  * A promise that resolves when the DOM is ready (interactive or complete).
@@ -59,6 +62,14 @@ const config: PagedConfig = window.PagedConfig || {
  * Initialize the previewer with optional settings from config.
  */
 const previewer = new Previewer(config.settings);
+
+/**
+ * Expose the running previewer instance on the window for manual control:
+ * `window.PagedPolyfill.preview()` starts a preview when `auto` is
+ * disabled, and the instance's event methods (`on`/`off`) can observe
+ * rendering ("rendering", "page", "rendered", ...).
+ */
+window.PagedPolyfill = previewer;
 
 /**
  * Main logic that runs once the DOM is ready.

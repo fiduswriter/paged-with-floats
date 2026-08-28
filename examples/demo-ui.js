@@ -167,7 +167,7 @@
 	async function generatePdf(		source,
 		{ title = document.title, onProgress, settings } = {},
 	) {
-		const { htmlToPDF, emitPdfFromPagedjsWindow, printHTML } =
+		const { htmlToPDF, emitPdfFromPagedWindow, printHTML } =
 			await import(new URL("paged.pdf.js", bundleBase()).href);
 		if (!onProgress) {
 			return htmlToPDF(source.replace(POLYFILL_TAG_RE, ""), {
@@ -191,7 +191,7 @@
 				settings,
 				errorCallback: reject,
 				printCallback: (win) => {
-					emitPdfFromPagedjsWindow(win, onProgress, {
+					emitPdfFromPagedWindow(win, onProgress, {
 						sourceHtml: source.replace(POLYFILL_TAG_RE, ""),
 						metadata: { title },
 						baseUrl: bundleBase(),

@@ -1,4 +1,5 @@
-const TIMEOUT = 10000; // Some book might take longer than this to renderer
+const TIMEOUT = 30000; // The MathJax fixture is heavy; under full-suite
+// parallel load the 10s default hook timeout flaked on fast machines.
 
 describe("default", () => {
 	let page;

@@ -7,7 +7,7 @@
  *    `html` with paged-with-floats inside a hidden iframe and hands the window to
  *    `printCallback` (default: browser print dialog).
  *
- * 2. `emitPdfFromPagedjsWindow(win)` — walks the paginated output in that
+ * 2. `emitPdfFromPagedWindow(win)` — walks the paginated output in that
  *    window and re-renders it as a real vector PDF (embedded subsetted
  *    fonts, link annotations, outline, metadata) using @pdfme/pdf-lib.
  *    This does the same job as vivliostyle-pdf's `emitPdfFromVivliostyleWindow`,
@@ -28,7 +28,7 @@
  */
 import { printHTML } from "./print.js";
 import {
-	emitPdfFromPagedjsWindow,
+	emitPdfFromPagedWindow,
 	type EmitMetadata,
 	type EmitOptions,
 } from "./pdf/pdf-emitter.js";
@@ -38,7 +38,7 @@ export {
 	type PrintHTMLConfig,
 } from "./print.js";
 export {
-	emitPdfFromPagedjsWindow,
+	emitPdfFromPagedWindow,
 } from "./pdf/pdf-emitter.js";
 
 /**
@@ -69,7 +69,7 @@ export interface HtmlToPDFOptions {
 /**
  * Paginates `html` with paged-with-floats and returns real vector PDF bytes —
  * no print dialog involved. Composition of `printHTML` and
- * `emitPdfFromPagedjsWindow`, with iframe cleanup handled internally.
+ * `emitPdfFromPagedWindow`, with iframe cleanup handled internally.
  *
  * @param html - A complete HTML document string.
  * @param options - Pagination and emission options.
@@ -106,7 +106,7 @@ export async function htmlToPDF(
 	});
 	try {
 		const win = iframe.contentWindow!;
-		return await emitPdfFromPagedjsWindow(win, undefined, emitOptions);
+		return await emitPdfFromPagedWindow(win, undefined, emitOptions);
 	} finally {
 		// Give microtasks spawned by emission a tick to unwind before the
 		// window they measured against disappears.

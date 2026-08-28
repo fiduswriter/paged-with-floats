@@ -390,7 +390,12 @@ export default `
 }
 
 .paged_pagebox > .paged_area > .paged_page_content > div:not(.paged_float_top):not(.paged_float_bottom) {
-	height: inherit;
+	/* height: 100%, NOT inherit: the content area's specified height is a
+	   calc() containing a percentage, and inherit takes that computed
+	   (still percentage-bearing) value and resolves it against this box's
+	   own containing block — subtracting the footnote height a second time
+	   and doubling every mid-page footnote growth into a column spill. */
+	height: 100%;
 }
 
 /* Float containers as direct children of the content area (single-column
@@ -416,7 +421,11 @@ export default `
    engine detects overflow against the host's vertical extent, so no CSS
    column-count is ever needed. */
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow {
-	height: inherit;
+	/* height: 100%, not inherit — see the note on the classic wrapper
+	   above: inherit re-resolves the content area's calc() height against
+	   this box's own containing block, subtracting the footnote height a
+	   second time. */
+	height: 100%;
 	position: relative;
 	display: flex;
 	flex-direction: column;
@@ -543,6 +552,18 @@ html, body {
 	counter-increment: page var(--paged-page-counter-increment);
 	width: var(--paged-width);
 	height: var(--paged-height);
+}
+
+/* Footnote counters are re-seeded on every page's area from the running
+   count the footnotes handler writes into --paged-footnotes-count on the
+   page element. The reset must live on .paged_area (a descendant), not on
+   .paged_page: pages use content-visibility: auto, which implies style
+   containment — the page's own counter state is isolated from its rendered
+   subtree, so a reset there is ignored by the markers and calls (they
+   restart at 1 in every engine). A reset on a descendant of the
+   content-visibility element is honored. */
+.paged_area {
+	counter-reset: footnote var(--paged-footnotes-count) footnote-marker var(--paged-footnotes-count);
 }
 
 .paged_page.paged_right_page {

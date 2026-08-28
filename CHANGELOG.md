@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.8.0 (2026-08-28)
+
+### Added
+
+- **Footnote area height reservation**: before a page's columns are filled,
+  the engine predicts what the page will hold and reserves the height the
+  footnote area will need — each note probed at real layout width, the
+  splitting paragraph's call positions refined via pretext line offsets and
+  the estimate iterated to the smallest safe reserve. Extracting notes no
+  longer shrinks already-laid-out columns, which previously spilled text and
+  pushed whole blocks to the next page, leaving empty trailing columns.
+  The footnotes handler treats the recorded reserve as a floor while the
+  page fills and releases the unused remainder when the page is done.
+- **Continuous footnote numbering across pages**: the footnotes handler
+  seeds each page with the running marker count and the counters re-seed on
+  the page's content area — required because `content-visibility: auto` on
+  pages implies style containment, which isolates the page element's own
+  counter state (spec behavior, identical in Chromium and Firefox). Markers
+  and call anchors now number continuously across the whole document.
+- **Part-end column balancing**: pages that end a part — a forced page break
+  or a deferred `column-span: all` heading — are marked during layout, and
+  their final manual-column row is converted to a native
+  `column-fill: balance` multicol block after rendering (reverted when the
+  balanced layout would overflow). Authors keep full control: an explicit
+  `column-fill: auto` leaves the sequential fill untouched.
+- **Footnote calls always travel with content**: overflow fragments that
+  consist of a bare footnote-call anchor (the marker wrapped past the column
+  edge on its own) are extended backward over the last word of the kept
+  text, so a call never lands alone in an otherwise empty paragraph.
+- **Footnote content survives page moves**: footnote elements in rebuilt
+  overflow fragments are cloned with their content, and duplicate landings
+  are dropped — empty marker shells no longer appear after a note's call
+  crosses a page boundary, and marker numbers no longer drift +1 against
+  their calls.
+- **Developer tools** (`dev-tools/`): `find-lost-content.mjs` diffs source
+  against rendered pages to locate lost or duplicated content,
+  `inspect-pages.mjs` audits per-page/per-column geometry (scroll/client
+  overflow, floats, notes), `dump-page.mjs` dumps per-column block text.
+  `AGENTS.md` documents the repository conventions for AI agents.
+
+### Fixed
+
+- **Whitespace lost after inline elements**: the layout walker was
+  re-created through `nodeAfter` after every deep clone (inline elements are
+  deep-cloned), and `nodeAfter` treated whitespace-only text nodes as
+  ignorable — spaces directly following `<i>`/`<b>`/`<span>` boundaries were
+  never rendered, concatenating words ("entomologistWilliam").
+  `nodeAfter` gained a `skipIgnorable` flag and the walker re-creation sites
+  render those spaces; `findElement` also hardened against text nodes.
+- **Footnote area doubled its footprint**: the flow host's `height: inherit`
+  re-resolved the content area's `calc(100% − var(--paged-footnotes-height))`
+  against its own containing block, so every pixel of footnote height
+  removed two pixels of column space and each mid-page footnote extraction
+  spilled double. The flow host now uses `height: 100%`.
+- **Deferred page floats rendered twice**: the deferred queue now suppresses
+  fresh clones of a float that is already queued, removing duplicated
+  captions without restricting float deferral.
+- **Lost / out-of-order content around footnote paragraph splits**: overflow
+  ranges map back to the source across footnote extraction and split
+  continuations (`indexOfTextNodeForOverflow`), residual overflow is
+  coalesced to the next page in document order — including later rendered
+  fragments of a kept split element — and carried overflow is rebuilt in
+  source order instead of being dropped or duplicated.
+- **Manual-column layout robustness**: column bounds account for top page
+  floats (the engine no longer treats the full page height as available
+  column space); runaway overflow collection bails out with a loop guard
+  instead of hanging the page; page floats with images are preloaded so
+  placement gets a real height; equal-height `column-span: all` segments are
+  height-planned per page instead of sharing the page equally, and spans
+  without room defer to the next page.
+- **Overflow tolerance**: spills smaller than one line are accepted as
+  tolerance slop (by the engine and the post-render audit) instead of
+  failing, and the residual sweep grants the same bottom-margin slack the
+  break verification uses — it no longer re-extracts lines the walk placed
+  inside their parent's bottom-margin zone.
+- **PDF export**: hyphenated words no longer overlap; text ranges split
+  across lines are measured correctly.
+
+### Changed
+
+- **Breaking (JavaScript API)**: `emitPdfFromPagedjsWindow` renamed to
+  `emitPdfFromPagedWindow`. `window.PagedPolyfill` is now actually defined —
+  it exposes the running previewer instance, so the documented
+  `window.PagedPolyfill.preview()` and its `on`/`off` event methods work
+  (previously the global did not exist and the spec harness's rendered
+  signal silently never fired).
+
+### Internal
+
+- Developer/agent workflow: `AGENTS.md` (repository conventions, layout
+  invariants, debugging recipes) and a `PLAN.md`-driven multi-part workflow
+  for the layout overhaul.
+- Overflow bookkeeping tags are cleared per column, and bounds re-measure
+  lazily via dirty-flagging (shared measurement batches per mutation).
+
 ## 0.7.0 (2026-08-26)
 
 ### Added

@@ -5,21 +5,22 @@
 **Live demos:** <https://johanneswilm.github.io/paged-with-floats/>
 
 paged-with-floats
-===========
+==================
 
-**paged-with-floats** is a fork of [Paged.js](https://github.com/pagedjs/pagedjs),
-an open-source library to display paginated content in the browser and to
-generate print books using web technology. It is maintained by **Johannes Wilm**
-and carries all of Paged.js's capabilities — a set of handlers for CSS
-transformations and fragmented layout which polyfill the
-[Paged Media](https://www.w3.org/TR/css-page-3/) and
-[Generated Content](https://www.w3.org/TR/css-gcpm-3/) CSS modules, along with
-hooks to create new handlers for custom properties.
+**paged-with-floats** is an open-source library to display paginated content
+in the browser and to generate print books using web technology. It polyfills
+the [Paged Media](https://www.w3.org/TR/css-page-3/) and
+[Generated Content for Paged Media](https://www.w3.org/TR/css-gcpm-3/) CSS
+modules — `@page` rules and page margin boxes, named pages, running headers
+via `string()`, footnotes with `::footnote-call` / `::footnote-marker`,
+target-counters, breaks and splits — and provides a handler and hook
+architecture for building custom layout logic on top.
 
-## What this fork adds
+## CSS Page Floats
 
-On top of Paged.js, this fork implements support for
-[CSS Page Floats](https://drafts.csswg.org/css-page-floats/):
+Elements can be pulled out of the normal flow and placed at the top or bottom
+edge of the page on which their anchor appears, as specified by the
+[CSS Page Floats](https://drafts.csswg.org/css-page-floats/) module:
 
 ```css
 figure {
@@ -28,11 +29,8 @@ figure {
 }
 ```
 
-Elements declared this way are pulled out of the normal flow and placed at the
-top or bottom edge of the page on which their anchor appears. If there is not
-enough room left on the page, the float defers to the next page while
-following content continues to fill the current one, as specified by the CSS
-Page Floats module.
+If there is not enough room left on the page, the float defers to the next
+page while following content continues to fill the current one.
 
 ## Multi-column layout
 
@@ -64,6 +62,36 @@ degraded to one column with a console warning) and RTL column order.
 spans pages it fills `auto` into the remaining space; once rendering
 completes the last fragment's height constraint is released so its columns
 balance — verified not to re-introduce overflow before the release sticks.
+Manual-column documents balance the final row of the last page and of every
+page that ends a part (a forced break or a deferred spanning heading), unless
+the author set `column-fill: auto`.
+
+## Footnotes
+
+Elements with `float: footnote` move into a footnote area at the bottom of
+the page, with a superscript call anchor left in the text:
+
+```css
+.footnote {
+	float: footnote;
+}
+
+::footnote-call {
+	vertical-align: super;
+	font-size: 0.8em;
+}
+
+::footnote-marker {
+	font-weight: bold;
+}
+```
+
+The footnote area is sized before the page's columns are filled (its height
+is estimated from the notes the page will extract), so note extraction never
+re-flows already-laid-out text. `footnote-policy` (`line` / `block`) and
+`footnote-display` (`block` / `inline`) are supported, notes that do not fit
+move to the next page together with their calls, and markers number
+continuously across pages.
 
 ## Text measurement
 
@@ -104,32 +132,15 @@ Pagination work is coalesced into time-boxed animation frames
 (`settings.renderFrameBudget`, default 12 ms) — raising it paginates faster
 at the cost of UI responsiveness during rendering.
 
-## Demos
-
-GitHub Pages hosts live demos (built by
-`.github/workflows/pages.yml` on every push to `main`; enable Pages with
-the “GitHub Actions” source once in the repository settings):
-
-- **The Malay Archipelago** (`examples/multicol-floats.html`) — editable
-  playground: modify the HTML source in a textarea, re-render the pages
-  on screen, or download a dynamically generated vector PDF.
-- **Alice in Wonderland / Frankenstein / Moby-Dick**
-  (`examples/books/*.html`) — complete public-domain books paginated on
-  screen in two, three and four columns respectively, each with a
-  one-click PDF download.
-
-To preview locally: `npm run build`, then serve the repository root
-(`npx serve .`) and open `examples/index.html`.
-
 ## Print & PDF export
 
-Two Vivliostyle-compatible APIs ship as a separate bundle
+Two print/PDF APIs ship as a separate bundle
 (`dist/paged.pdf.js`, `import ... from "paged-with-floats/pdf"`):
 
 ```ts
 import {
 	printHTML,
-	emitPdfFromPagedjsWindow,
+	emitPdfFromPagedWindow,
 	htmlToPDF,
 } from "paged-with-floats/pdf";
 
@@ -141,15 +152,14 @@ printHTML(htmlDoc, {
 	errorCallback: (message) => alert(message),      // optional
 });
 
-// 2. emitPdfFromPagedjsWindow does the same job as vivliostyle-pdf's
-//    `emitPdfFromVivliostyleWindow`, but for paged-with-floats-paginated windows:
-//    real vector PDF with embedded/subsetted fonts, link annotations,
-//    outline and metadata. Composed exactly like the vivliostyle pair:
+// 2. emitPdfFromPagedWindow produces a real vector PDF with
+//    embedded/subsetted fonts, link annotations, outline and metadata
+//    from the paginated window:
 printHTML(htmlDoc, {
 	title: "My document",
 	keepIframe: true,
 	printCallback: (win) => {
-		emitPdfFromPagedjsWindow(win, console.log, {
+		emitPdfFromPagedWindow(win, console.log, {
 			sourceHtml: htmlDoc,
 			metadata: { title: "My document" },
 		}).then((bytes) => download(new Blob([bytes])));
@@ -163,7 +173,7 @@ const bytes = await htmlToPDF(htmlDoc, {
 download(new Blob([bytes], { type: "application/pdf" }));
 ```
 
-The emitter is derived from
+The PDF emitter is derived from
 [vivliostyle-pdf](https://github.com/fiduswriter/vivliostyle-pdf)
 (LGPL-3.0-or-later, same author). Fallback fonts for documents without
 `@font-face` rules are bundled in `assets/fonts/` and copied to
@@ -177,62 +187,6 @@ page floats and footnotes.
 The library is written in strict TypeScript and ships type declarations;
 `import { Previewer } from "paged-with-floats"` is fully typed, including
 the handler/hook APIs used for extensions.
-
-## How this library compares to Vivliostyle
-
-[Vivliostyle](https://vivliostyle.org/) is the most complete open-source CSS
-typesetting engine available today. This library does not attempt to match it,
-and if its license terms work for you, you should generally prefer it.
-
-**License.** Vivliostyle.js is licensed under the
-[GNU AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html) — a strong copyleft
-license that also applies when the software is used to serve content over a
-network: applications and services built on it must make their source
-available under compatible terms. **paged-with-floats is licensed under the
-GNU LGPL-3.0-or-later**, which permits using and embedding the library in
-applications of any kind — including proprietary ones — provided the library
-itself remains free and replaceable. If your project cannot accept AGPL
-terms, that is the reason this fork exists.
-
-**Features.** Vivliostyle implements substantially more of the CSS standards
-than this library does. Its [Supported CSS Features](https://docs.vivliostyle.org/en/reference/supported-css-features/)
-reference documents the full picture; the most significant gaps here are:
-
-- **Page floats** — this library supports only `float-reference: page` with
-  `float: top` / `float: bottom`, placed as stacked blocks with no text
-  wrapping around them. Vivliostyle supports the complete module: all float
-  values (`block-start`/`block-end`/`inline-start`/`inline-end`, `left`,
-  `right`, corner combinations, `snap-block`), `float-reference: column` and
-  `region`, the extended `clear` values, `float-min-wrap-block`, and real text
-  wrapping around floats.
-- **Multi-column layout** — this library paginates root-level and mid-flow
-  multicol content (`column-count`/`columns`/`column-span: all`). Vivliostyle
-  additionally covers balancing across fragmented pages, column-relative page
-  floats and RTL column order.
-- **Writing modes** — vertical writing and RTL layouts (CSS Writing Modes 3)
-  are supported by Vivliostyle; this library assumes horizontal top-to-bottom
-  writing.
-- **Fragmentation fidelity** — Vivliostyle runs its own layout engine;
-  this library builds on browser layout measurement heuristics, so edge cases
-  around `break-inside`, tables and nested structures are handled less robustly.
-- **Footnotes and GCPM** — footnote handling here is simpler; Vivliostyle
-  additionally supports `running()`/`element()` running elements, `leader()`,
-  `initial-letter`, EPUB adaptive layout and more.
-
-In short: use **Vivliostyle** for maximum standards coverage and typesetting
-fidelity; use **paged-with-floats** when the LGPL license is required and the
-feature set described above is sufficient for your needs.
-
-For documentation of the CSS standards implemented here — which properties
-and values exist, and how they are specified to behave — use Vivliostyle's
-[Supported CSS Features](https://docs.vivliostyle.org/en/reference/supported-css-features/)
-reference and the rest of the [Vivliostyle documentation](https://docs.vivliostyle.org/en/);
-they are the most complete available documentation of practical CSS paged
-media typesetting.
-
-A hands-on overview to getting started with CSS typesetting is available in
-the [Vivliostyle tutorials](https://vivliostyle.org/tutorials/) and the
-[Vivliostyle samples](https://vivliostyle.org/samples/).
 
 ## NPM Module
 ```sh
@@ -291,19 +245,8 @@ whenever you want to start.
 ## Chunker
 Chunks up a document into paged media flows and applies print classes.
 
-For paginated examples of the CSS standards involved, see the
-[Vivliostyle samples](https://vivliostyle.org/samples/).
-
 ## Polisher
 Converts `@page` css to classes, and applies counters and content.
-
-### CLI
-
-This library itself does not ship a command line tool. For rendering HTML/CSS
-documents to PDF from the command line, [Vivliostyle CLI](https://github.com/vivliostyle/vivliostyle-cli)
-([documentation](https://docs.vivliostyle.org/en/cli/)) is the most capable
-open-source option; it works with any HTML/CSS document, independently of this
-library.
 
 ## Module
 
@@ -516,80 +459,10 @@ By default the container will run the development server with `npm start`
 docker run -it -p 9090:9090 paged-with-floats
 ```
 
-## Acknowledgments
-
-This project exists because of the extraordinary work of the Paged.js
-development team, whose code forms the foundation that this fork builds upon.
-We gratefully acknowledge:
-
-**Fred Chasen**, the principal author and architect of Paged.js. Fred wrote the
-overwhelming majority of the codebase — several hundred commits covering the
-chunker, the fragmentation and overflow engine, the CSS polisher, the page
-template system, the handler and hooks architecture, and most of the feature
-modules, including footnotes, string-sets, target-counters, generated content,
-breaks and splits. Virtually every line of pagination machinery in this
-repository originates in his work, and this fork would not exist without it.
-
-**Julien Taquet**, long-time core developer, who contributed continuously
-across the whole project — typography and print CSS handling, page margin
-boxes, named pages, bleed and marks support, and years of day-to-day
-maintenance, testing and refinement of the rendering pipeline.
-
-**Julie Blanc**, long-time core developer and designer, whose contributions
-shaped the CSS processing side of the library — from `@page` conversion and
-margin boxes to the visual design of paginated output — along with extensive
-testing and documentation of print behaviors.
-
-**Guillaume Grossetie**, one of the most prolific external contributors, whose
-many commits improved the chunker and layout engine, break handling, and
-numerous edge cases throughout the codebase.
-
-**Nellie McKesson**, whose early contributions helped carry the project through
-its formative period.
-
-With additional substantial contributions from:
-
-Martin Heini,
-Thomas Parisot,
-Antonin Libotte,
-Erik Schilling,
-Marius Dumitru Florea,
-Nigel Cunningham,
-William Muir,
-Martin Olsson,
-Nathan Schulzke,
-Gijs de Heij,
-
-and further fixes and improvements from:
-
-Andrey Kislyuk,
-Angela Liu,
-Chris Beaven,
-Edoardo Tona,
-JenniferVdL,
-Jonathan Boarman,
-Lucas Willems,
-Malte Rohde,
-Mauro Bieg,
-Nicholas Wylie,
-Patrick Kranz,
-Rob Mayer,
-Sam Ruby,
-Stéphane Elbaron,
-Talbi Youssef,
-Urban Suppiger,
-Yann Trividic,
-Antoine Fauchié,
-mb21,
-wangfengming,
-wenbei421.
-
-Thank you — every page rendered by this library rests on your work.
-
 ## License
 
 Everything generated as part of **paged-with-floats** — all modifications and
-additions made in this fork, including the complete page floats
+additions made in this repository, including the complete page floats
 implementation — is
 
 > Copyright (C) 2026 Johannes Wilm
@@ -598,9 +471,13 @@ and licensed under the **GNU Lesser General Public License, version 3 or later
 (LGPL-3.0-or-later)**. The full license texts are included in this repository
 as [`COPYING.LESSER`](./COPYING.LESSER) (LGPL-3.0) and [`COPYING`](./COPYING)
 (GPL-3.0, which the LGPL incorporates); see also
-<https://www.gnu.org/licenses/>.
+<https://www.gnu.org/licenses/>. The license provenance of the pre-existing
+code this library builds upon is documented in
+[`LICENSE.md`](./LICENSE.md) and in the
+[Acknowledgments](./ACKNOWLEDGMENTS.md).
 
-The pre-existing Paged.js code that this fork builds upon remains covered by
-its original **MIT license**, whose copyright and permission notice is
-reproduced verbatim in [`LICENSE.md`](./LICENSE.md), as required by that
-license, and accompanies every distributed build in the file banner.
+## Acknowledgments
+
+This library builds on the work of many contributors to the open-source
+paginated-media ecosystem. The full credits are in
+[`ACKNOWLEDGMENTS.md`](./ACKNOWLEDGMENTS.md).

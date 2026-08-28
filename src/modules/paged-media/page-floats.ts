@@ -120,6 +120,14 @@ class PageFloats extends Handler {
 		this.deferredCounts = {};
 
 		/**
+		 * Data-refs of floats that are currently deferred. A float that is
+		 * deferred should not be placed again from a newly rendered clone; the
+		 * queued deferred element is the one that will be positioned.
+		 * @type {Set<string>}
+		 */
+		this.deferredRefs = new Set();
+
+		/**
 		 * Currently placed floats by data-ref, used to follow anchors
 		 * across fragmentation.
 		 * @type {Map<string, {element: Element, side: string, outerHeight: number}>}
@@ -282,6 +290,14 @@ class PageFloats extends Handler {
 		);
 
 		targets.forEach((element) => {
+			let ref = element.dataset.ref;
+			if (ref && this.deferredRefs.has(ref)) {
+				// This clone belongs to a float that is already queued for
+				// deferred placement; the deferred element will be moved to
+				// the correct page, so discard the new clone to avoid duplicates.
+				element.remove();
+				return;
+			}
 			element.dataset.pageFloatPlaced = "true";
 			this.placeFloat(
 				element,
@@ -384,6 +400,14 @@ class PageFloats extends Handler {
 	 * @returns {void}
 	 */
 	afterPageLayout(pageElement: HTMLElement, page: FloatsPage, breakToken: BreakToken | null, chunker: FloatsChunker) {
+		// Floats that survived the page's overflow handling have landed;
+		// stop suppressing freshly rendered clones for them.
+		for (let [ref, entry] of Array.from(this.placed)) {
+			if (entry.element.isConnected) {
+				this.deferredRefs.delete(ref);
+			}
+		}
+
 		if (!breakToken && this.deferred.length) {
 			this.continueForDeferred(chunker);
 		}
@@ -544,6 +568,7 @@ class PageFloats extends Handler {
 	deferFloat(element: HTMLElement, side: string, anchorRef?: string) {
 		let ref = element.dataset.ref;
 		if (ref) {
+			this.deferredRefs.add(ref);
 			this.deferredCounts[ref] = (this.deferredCounts[ref] || 0) + 1;
 			if (this.deferredCounts[ref] > MAX_DEFERRALS) {
 				console.warn(

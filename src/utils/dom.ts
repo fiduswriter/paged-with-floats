@@ -76,18 +76,33 @@ export function nodeAfter(
 	node: Node,
 	limiter?: Node,
 	descend = false,
+	skipIgnorable = true,
 ): Node | undefined {
 	if (limiter && node === limiter) {
 		return;
 	}
 	if (descend && node.childNodes.length) {
 		let child: Node | null = node.firstChild;
-		if (isIgnorable(child!)) {
+		if (skipIgnorable && isIgnorable(child!)) {
 			child = nextSignificantNode(child!);
 		}
 		if (child) {
 			return child;
 		}
+	}
+	if (!skipIgnorable) {
+		// Literal next node, climbing past the subtree boundary: whitespace
+		// text nodes are significant for rendering (a lost space between two
+		// inline elements concatenates their words).
+		let next: Node | null = node.nextSibling;
+		while (!next && node.parentNode) {
+			node = node.parentNode as Node;
+			if (limiter && node === limiter) {
+				return;
+			}
+			next = node.nextSibling;
+		}
+		return next ?? undefined;
 	}
 	let significantNode = nextSignificantNode(node);
 	if (significantNode) {
@@ -1054,8 +1069,8 @@ export function findElement(
 	doc?: NodeWithRefs,
 	forceQuery?: boolean,
 ): Element | null | undefined {
-	if (!doc) return;
-	const ref = (node as Element).getAttribute("data-ref");
+	if (!doc || !isElement(node)) return;
+	const ref = node.getAttribute("data-ref");
 	return findRef(ref, doc, forceQuery);
 }
 
@@ -1272,6 +1287,96 @@ export function indexOfTextNode(
 	}
 
 	return index;
+}
+
+/**
+ * Finds the index of a rendered text node within its source parent. Text
+ * nodes are matched by their ordinal position among non-ignorable text-node
+ * children, so the mapping stays correct even when footnote spans/calls have
+ * changed the element's child list.
+ *
+ * @param {Node} node The rendered text node to map.
+ * @param {Element} renderedParent The rendered parent (e.g. paragraph).
+ * @param {Element} sourceParent The source parent.
+ * @param {string} hyphen The hyphenation string to remove if present at the end of the text.
+ * @returns {{index: number; offsetAdjustment: number}} The index of the source text node and any offset adjustment needed.
+ */
+export function indexOfTextNodeForOverflow(
+	node: Node,
+	renderedParent: Element,
+	sourceParent: Element,
+	hyphen: string,
+): { index: number; offsetAdjustment: number } {
+	if (!isText(node)) {
+		return { index: -1, offsetAdjustment: 0 };
+	}
+
+	// Count non-ignorable rendered text nodes before this one.
+	let renderedTextIndex = 0;
+	let found = false;
+	for (const child of renderedParent.childNodes) {
+		if (child === node) {
+			found = true;
+			break;
+		}
+		if (isText(child) && !isIgnorable(child)) {
+			renderedTextIndex++;
+		}
+	}
+	if (!found) {
+		return {
+			index: indexOfTextNode(node, sourceParent, hyphen),
+			offsetAdjustment: 0,
+		};
+	}
+
+	// Find the matching source text node, skipping footnote spans.
+	let sourceTextIndex = 0;
+	for (const child of sourceParent.childNodes) {
+		if (isText(child)) {
+			if (sourceTextIndex === renderedTextIndex) {
+				return {
+					index: Array.prototype.indexOf.call(
+						sourceParent.childNodes,
+						child,
+					),
+					offsetAdjustment: 0,
+				};
+			}
+			if (!isIgnorable(child)) {
+				sourceTextIndex++;
+			}
+		} else if (isElement(child)) {
+			// Footnote spans are removed from the rendered paragraph; their
+			// text nodes are not present there, so skip them here too.
+			if ((child as HTMLElement).dataset.note === "footnote") {
+				continue;
+			}
+		}
+	}
+
+	// The rendered paragraph has more text nodes than the source — a split
+	// continuation re-wrapped into extra nodes (e.g. a hyphenation split).
+	// Map to the last source text node; `createOverflow` then resolves the
+	// exact offset within it by content. This keeps the overflow anchored
+	// instead of dropping it (the old content matcher throws on an adjacent
+	// text-node previous sibling).
+	let lastTextIndex = -1;
+	for (const child of sourceParent.childNodes) {
+		if (isText(child) && !isIgnorable(child)) {
+			lastTextIndex = Array.prototype.indexOf.call(
+				sourceParent.childNodes,
+				child,
+			);
+		}
+	}
+	if (lastTextIndex >= 0) {
+		return { index: lastTextIndex, offsetAdjustment: 0 };
+	}
+	return {
+		index: indexOfTextNode(node, sourceParent, hyphen),
+		offsetAdjustment: 0,
+	};
 }
 
 /**

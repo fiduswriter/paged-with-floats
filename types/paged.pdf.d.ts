@@ -1,6 +1,6 @@
 import { type EmitMetadata, type EmitOptions } from "./pdf/pdf-emitter.js";
 export { printHTML, type PrintHTMLConfig, } from "./print.js";
-export { emitPdfFromPagedjsWindow, } from "./pdf/pdf-emitter.js";
+export { emitPdfFromPagedWindow, } from "./pdf/pdf-emitter.js";
 /**
  * Options for {@link htmlToPDF}: pagination/print configuration combined
  * with the PDF emission extras.
@@ -28,7 +28,7 @@ export interface HtmlToPDFOptions {
 /**
  * Paginates `html` with paged-with-floats and returns real vector PDF bytes —
  * no print dialog involved. Composition of `printHTML` and
- * `emitPdfFromPagedjsWindow`, with iframe cleanup handled internally.
+ * `emitPdfFromPagedWindow`, with iframe cleanup handled internally.
  *
  * @param html - A complete HTML document string.
  * @param options - Pagination and emission options.

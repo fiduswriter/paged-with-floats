@@ -21,9 +21,13 @@ describe("footnotes-place", () => {
 		expect(pages).toEqual(3);
 	});
 
-	it("should have two callouts on page 1", async () => {
+	it("should have one callout on page 1", async () => {
+		// With the footnote area height reserved up front the columns hold
+		// honest space (the pre-reserve layout spilled text past the column
+		// bottom into the margin, which let the second call squeeze onto
+		// page 1). Under clean layout the second call starts page 2.
 		let callouts = await page.$$eval("[data-page-number='1'] [data-footnote-call]", (r) => r.length);
-		expect(callouts).toEqual(2);
+		expect(callouts).toEqual(1);
 	});
 
 	it("should have only one footnote on page 1", async () => {

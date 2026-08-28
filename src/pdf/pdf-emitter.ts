@@ -296,7 +296,7 @@ export interface EmitAttachment {
     description?: string
 }
 
-/** Optional extras for emitPdfFromPagedjsWindow. */
+/** Optional extras for emitPdfFromPagedWindow. */
 export interface EmitOptions {
     /**
      * The document's HTML source. Used for `@font-face` discovery when the
@@ -338,7 +338,7 @@ export interface EmitOptions {
  * @param options  optional extras (HTML source attachment)
  * @returns the PDF file bytes
  */
-export async function emitPdfFromPagedjsWindow(
+export async function emitPdfFromPagedWindow(
     win: Window,
     onProgress?: (message: string) => void,
     options?: EmitOptions
@@ -357,7 +357,7 @@ export async function emitPdfFromPagedjsWindow(
     // from the final layout.
     await doc.fonts.ready;
 
-    // Pagedjs pages are all visible; still force one reflow so any pending
+    // Paged pages are all visible; still force one reflow so any pending
     // mutations (e.g. the post-render multicol rebalance) are laid out
     // before text rects are measured.
     void doc.body.offsetWidth;

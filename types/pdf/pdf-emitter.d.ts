@@ -73,7 +73,7 @@ export interface EmitAttachment {
     mimeType: string;
     description?: string;
 }
-/** Optional extras for emitPdfFromPagedjsWindow. */
+/** Optional extras for emitPdfFromPagedWindow. */
 export interface EmitOptions {
     /**
      * The document's HTML source. Used for `@font-face` discovery when the
@@ -114,7 +114,7 @@ export interface EmitOptions {
  * @param options  optional extras (HTML source attachment)
  * @returns the PDF file bytes
  */
-export declare function emitPdfFromPagedjsWindow(win: Window, onProgress?: (message: string) => void, options?: EmitOptions): Promise<Uint8Array>;
+export declare function emitPdfFromPagedWindow(win: Window, onProgress?: (message: string) => void, options?: EmitOptions): Promise<Uint8Array>;
 /**
  * Split a run's text into segments per font so every character is drawn with
  * a font that actually contains its glyph: the CSS-selected primary font
