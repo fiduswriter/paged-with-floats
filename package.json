@@ -1,6 +1,6 @@
 {
   "name": "paged-with-floats",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Fork of Paged.js: chunks up a document into paged media flows, applies print styles, and adds support for CSS page floats",
   "author": "Johannes Wilm",
   "maintainers": [
@@ -37,11 +37,11 @@
     "Patrick Kranz",
     "Rob Mayer",
     "Sam Ruby",
-    "St\u00e9phane Elbaron",
+    "Stéphane Elbaron",
     "Talbi Youssef",
     "Urban Suppiger",
     "Yann Trividic",
-    "Antoine Fauchi\u00e9",
+    "Antoine Fauchié",
     "mb21",
     "wangfengming",
     "wenbei421"
