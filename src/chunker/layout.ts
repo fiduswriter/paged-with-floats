@@ -4643,6 +4643,14 @@ class Layout {
 			let pos = getBoundingClientRect(child as Element)!;
 			let bottomMargin = 0;
 
+			// Whitespace between table rows and other unrendered text has no
+			// client rects. Its zero rect would read as "before the left edge"
+			// in the bounds comparison below, so it must never be treated as
+			// the start of an overflow.
+			if (isText(child) && pos.width === 0 && pos.height === 0) {
+				continue;
+			}
+
 			let hasStart = false;
 			let hasEnd = false;
 

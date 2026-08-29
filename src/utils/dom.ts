@@ -515,7 +515,9 @@ export function rebuildTree(
 		}
 
 		if (subject.previousElementSibling?.nodeName == "THEAD") {
-			// Clone the THEAD too.
+			// Repeat the THEAD on the continuation so the fragment carries
+			// visible table headers (css-tables-3 header repetition). Column
+			// widths are copied from the already rendered original.
 			let sibling: Element | null = subject.previousElementSibling;
 
 			let existing = findElement(sibling, container),
@@ -537,24 +539,11 @@ export function rebuildTree(
 							if (isElement(pos)) {
 								originalElement = findElement(pos, alreadyRendered);
 								copyWidth(originalElement!, pos);
-
-								// I've tried to make the THEAD invisible; this is the best
-								// I could achieve. It gets a zero height but still somehow
-								// affects the container height by a couple of pixels in my
-								// testing. :(
-								pos.style.visibility = "collapse";
-								pos.style.marginTop = "0px";
-								pos.style.marginBottom = "0px";
-								pos.style.paddingTop = "0px";
-								pos.style.paddingBottom = "0px";
-								pos.style.borderTop = "0px";
-								pos.style.borderBottom = "0px";
-								pos.style.lineHeight = "0px";
-								pos.style.opacity = "0";
 							}
 						}
 					}
 				}
+				siblingClone.setAttribute("data-repeated-thead", "true");
 				container.insertBefore(siblingClone, container.firstChild);
 			}
 
