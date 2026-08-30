@@ -5,48 +5,32 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: github-pages
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+            - uses: actions/checkout@v4
 
-      - run: npm ci
+            - uses: pnpm/action-setup@v4
 
-      - name: Build library bundles
-        run: npm run build
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
 
-      - name: Assemble site
-        run: |
-          mkdir -p site
-          cp -r dist site/dist
-          cp -r examples site/examples
+            - name: Generate assets
+              run: pnpm run gen:assets
 
-          cp -r assets site/assets
-          # Landing page at the site root; its links point into examples/.
-          cp index.html site/index.html
+            - name: Build demo
+              run: pnpm run build:demo
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+            - name: Deploy to Pages branch
+              run: |
+                  rm -rf _pages
+                  mkdir -p _pages
+                  cp -r dist/* _pages/
+                  cd _pages
+                  git init
+                  git config user.name "CI"
+                  git config user.email "ci@fiduswriter.org"
+                  git add -A
+                  git commit -m "Deploy demo [skip ci]"
+                  git push -f "https://${{ secrets.PAGES_TOKEN }}@git.fiduswriter.org/${{ github.repository }}.git" HEAD:pages
