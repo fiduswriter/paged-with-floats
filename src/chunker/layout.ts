@@ -5184,6 +5184,39 @@ class Layout {
 		return range;
 	}
 
+	/**
+	 * When the overflow starts inside a table row, return that row so the
+	 * break can be moved before it ("split between rows"). Returns undefined
+	 * when the node is not inside a row of a rendered table, or when the row
+	 * alone is taller than a full page — a mid-row split is then the only
+	 * remaining option.
+	 */
+	tableRowNeedsBreakAt(
+		node: Node,
+		rendered: HTMLElement,
+		bounds: DOMRect,
+	): Element | undefined {
+		const element = isElement(node)
+			? (node as Element)
+			: node.parentElement;
+		const row = element?.closest("tr");
+		if (!row || !row.isConnected || !rendered.contains(row)) {
+			return;
+		}
+		const rowBounds = getBoundingClientRect(row);
+		if (!rowBounds) {
+			return;
+		}
+		const height =
+			rowBounds.width > bounds.width
+				? this.getUnconstrainedElementHeight(row)
+				: rowBounds.height;
+		if (height > bounds.height) {
+			return;
+		}
+		return row;
+	}
+
 	rowspanNeedsBreakAt(
 		tableRow: Element,
 		rendered: HTMLElement,
@@ -5324,6 +5357,24 @@ class Layout {
 			);
 
 			let rowspanNeedsBreakAt: Element | undefined;
+
+			// Tables must only split between rows. If the overflow starts
+			// inside a table row, break before that row instead — unless the
+			// row alone is taller than a full page, in which case a mid-row
+			// split is the only remaining option.
+			if (hasOverflow) {
+				const rowBreakAt = this.tableRowNeedsBreakAt(
+					check!,
+					rendered,
+					bounds,
+				);
+				if (rowBreakAt) {
+					rangeStart = rowBreakAt;
+					const table = rowBreakAt.closest("table");
+					rangeEnd = (table ?? rendered).lastChild;
+					break;
+				}
+			}
 
 			if (hasOverflow && this.avoidBreakInside(check!, rendered)) {
 				rowspanNeedsBreakAt = this.rowspanNeedsBreakAt(
