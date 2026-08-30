@@ -5185,11 +5185,70 @@ class Layout {
 	}
 
 	/**
-	 * When the overflow starts inside a table row, return that row so the
-	 * break can be moved before it ("split between rows"). Returns undefined
-	 * when the node is not inside a row of a rendered table, or when the row
-	 * alone is taller than a full page — a mid-row split is then the only
-	 * remaining option.
+	 * Number of body rows (rows outside the thead) that would remain on the
+	 * current page before `row` within its table. Zero means a break before
+	 * `row` would leave only the header group — and possibly a caption — on
+	 * this page.
+	 */
+	tableBodyRowsBefore(row: Element, table: Element): number {
+		let count = 0;
+		for (const tableRow of Array.from(
+			(table as HTMLTableElement).rows ?? [],
+		)) {
+			if (tableRow === row || (tableRow as Element) === row) {
+				break;
+			}
+			if (
+				!tableRow.closest("thead") &&
+				tableRow.closest("table") === table
+			) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	/**
+	 * Whether any visible content precedes `element` on the current page —
+	 * i.e. the element does not start the page's content.
+	 */
+	hasVisibleContentBefore(element: Element, rendered: HTMLElement): boolean {
+		let current: Node | null = element;
+		while (current && current !== rendered) {
+			let prev: ChildNode | null = (current as ChildNode)
+				.previousSibling;
+			while (prev) {
+				const target = isElement(prev)
+					? (prev as Element)
+					: prev.parentElement;
+				if (target && target !== rendered) {
+					const rect = getBoundingClientRect(target);
+					if (rect && rect.height > 0) {
+						return true;
+					}
+				}
+				prev = prev.previousSibling;
+			}
+			current = current.parentElement;
+		}
+		return false;
+	}
+
+	/**
+	 * When the overflow starts inside a table row, return the element the
+	 * break must be placed before: the row itself ("split between rows") —
+	 * or, when breaking before the row would leave a fragment containing
+	 * only the header group (and possibly a caption), the whole table,
+	 * caption included, which then moves to the next container (page or
+	 * column) and splits between rows from there — even when it is taller
+	 * than a full page. Moving the table is only skipped when it already
+	 * starts the page's content: moving it to the next container would then
+	 * never converge, so the header fragment stays and rows split from the
+	 * row in question. Rows asking not to be split (break-inside: avoid)
+	 * and rows taller than a full page are left to the existing machinery
+	 * (mid-row splitting, rowspan-aware breaking). Returns undefined for
+	 * both of those and when the node is not inside a row of a rendered
+	 * table.
 	 */
 	tableRowNeedsBreakAt(
 		node: Node,
@@ -5212,6 +5271,25 @@ class Layout {
 				? this.getUnconstrainedElementHeight(row)
 				: rowBounds.height;
 		if (height > bounds.height) {
+			return;
+		}
+		const table = row.closest("table");
+		if (
+			table &&
+			table !== rendered &&
+			rendered.contains(table) &&
+			this.tableBodyRowsBefore(row, table) === 0 &&
+			this.hasVisibleContentBefore(table, rendered)
+		) {
+			// Only the header group (and possibly a caption) would remain on
+			// this page, and the page carries other content before the
+			// table: move the entire table.
+			return table;
+		}
+		if ((row as HTMLElement).dataset.originalBreakInside === "avoid") {
+			// The row opts out of splitting: defer to the existing
+			// break-inside/rowspan machinery instead of forcing a break
+			// before the row.
 			return;
 		}
 		return row;
@@ -5370,8 +5448,16 @@ class Layout {
 				);
 				if (rowBreakAt) {
 					rangeStart = rowBreakAt;
-					const table = rowBreakAt.closest("table");
-					rangeEnd = (table ?? rendered).lastChild;
+					if (rowBreakAt.nodeName === "TABLE") {
+						// Whole-table move: the range must cover the table
+						// element itself (selectNode + setEndAfter), ending
+						// after it — an end inside the table would leave an
+						// empty table shell on this page.
+						rangeEnd = rowBreakAt;
+					} else {
+						const table = rowBreakAt.closest("table");
+						rangeEnd = (table ?? rendered).lastChild;
+					}
 					break;
 				}
 			}
