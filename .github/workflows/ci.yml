@@ -14,17 +14,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build library
-        run: npm run pretest
+        run: pnpm run pretest
 
       - name: Resolve Playwright version
         id: playwright
@@ -33,16 +35,16 @@ jobs:
           >> "$GITHUB_OUTPUT"
 
       - name: Install Chromium for DOM specs
-        run: npx -y playwright@${{ steps.playwright.outputs.version }} install chromium --with-deps
+        run: pnpm dlx playwright@${{ steps.playwright.outputs.version }} install chromium --with-deps
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Unit tests
-        run: npx jest
+        run: pnpm jest
 
       - name: DOM specs
-        run: npm run specs-dom
+        run: pnpm run specs-dom
 
   render-specs:
     name: PDF render-baseline specs (main only)
