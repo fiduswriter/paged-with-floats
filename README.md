@@ -16,6 +16,8 @@ via `string()`, footnotes with `::footnote-call` / `::footnote-marker`,
 target-counters, breaks and splits — and provides a handler and hook
 architecture for building custom layout logic on top.
 
+For a feature comparison with Vivliostyle, see [COMPARISON.md](./COMPARISON.md).
+
 ## CSS Page Floats
 
 Elements can be pulled out of the normal flow and placed at the top or bottom

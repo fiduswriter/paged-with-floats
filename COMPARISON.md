@@ -20,28 +20,59 @@ terms, that is the reason this library exists.
 
 Vivliostyle implements substantially more of the CSS standards than this
 library does. Its [Supported CSS Features](https://docs.vivliostyle.org/en/reference/supported-css-features/)
-reference documents the full picture; the most significant gaps here are:
+reference documents the full picture. The table below summarizes how the two
+projects cover the CSS specifications most relevant to paged media.
 
-- **Page floats** — this library supports only `float-reference: page` with
-  `float: top` / `float: bottom`, placed as stacked blocks with no text
-  wrapping around them. Vivliostyle supports the complete module: all float
-  values (`block-start`/`block-end`/`inline-start`/`inline-end`, `left`,
-  `right`, corner combinations, `snap-block`), `float-reference: column` and
-  `region`, the extended `clear` values, `float-min-wrap-block`, and real text
-  wrapping around floats.
-- **Multi-column layout** — this library paginates root-level and mid-flow
-  multicol content (`column-count`/`columns`/`column-span: all`). Vivliostyle
-  additionally covers balancing across fragmented pages, column-relative page
-  floats and RTL column order.
-- **Writing modes** — vertical writing and RTL layouts (CSS Writing Modes 3)
-  are supported by Vivliostyle; this library assumes horizontal top-to-bottom
-  writing.
-- **Fragmentation fidelity** — Vivliostyle runs its own layout engine;
-  this library builds on browser layout measurement heuristics, so edge cases
-  around `break-inside`, tables and nested structures are handled less robustly.
-- **Footnotes and GCPM** — footnote handling here is simpler; Vivliostyle
-  additionally supports `running()`/`element()` running elements, `leader()`,
-  `initial-letter`, EPUB adaptive layout and more.
+| Feature / CSS module | Vivliostyle | paged-with-floats | Notes |
+|---|---|---|---|
+| **CSS Paged Media 3** | | | |
+| `@page` rules, `size`, `bleed`, `marks` | ✅ Full | ✅ Full | |
+| Page-margin boxes (`@top-left`, `@top-center`, …) | ✅ Full | ✅ Full | |
+| Page selectors `:left`, `:right` | ✅ Full | ✅ Full | |
+| Page selectors `:first`, `:blank`, `:nth()` | ✅ Full | ⚠️ Basic | Vivliostyle also supports `:nth(An+B of <page-type>)` page-group matching. |
+| Named pages (`page` property) | ✅ Full | ✅ Full | |
+| Page-based counters (`page`, `pages`) | ✅ Full | ✅ Full | |
+| `:recto` / `:verso` page selectors | ✅ Full | ❌ None | `recto`/`verso` *break* values are supported by paged-with-floats. |
+| Non-standard crop/inside-outside margin properties | ✅ Full | ❌ None | `crop-offset`, `crop-marks-line-color`, `margin-inside`/`margin-outside`, etc. |
+| **CSS Fragmentation** | | | |
+| `break-before` / `break-after` | ✅ Full | ⚠️ Partial | paged-with-floats supports `page`/`always`/`left`/`right`/`recto`/`verso` and `avoid`; not `column`/`region`. |
+| `break-inside: avoid` | ✅ Full | ✅ Basic | Vivliostyle treats `avoid-page`/`avoid-column`/`avoid-region` as `avoid`. |
+| `box-decoration-break` | ✅ Full | ❌ None | |
+| `margin-break` | ✅ Full | ❌ None | |
+| **CSS Multi-column Layout** | | | |
+| `column-count`, `columns`, `column-gap`, `column-rule-*` | ✅ Full | ✅ Full | |
+| `column-span: all` | ✅ Full | ✅ Full | Vivliostyle root multicol only spans page floats; non-root multicol is unrestricted. |
+| `column-fill` | ✅ Full | ⚠️ Partial | paged-with-floats balances only the final fragment and part-ending rows. |
+| Nested multicol containers | ✅ Full | ❌ None | paged-with-floats degrades the inner container to one column. |
+| RTL / vertical column order | ✅ Full | ❌ None | |
+| **CSS Page Floats** | | | |
+| Basic page floats (`float-reference: page; float: top/bottom`) | ✅ Full | ⚠️ Partial | paged-with-floats stacks floats as blocks; text does not wrap around them. |
+| Logical / corner float values (`block-start`, `inline-start`, `snap-block`, combinations) | ✅ Full | ❌ None | paged-with-floats accepts `block-start`/`block-end` as aliases for top/bottom only. |
+| `float-reference: column` / `region` | ✅ Full | ❌ None | |
+| Extended `clear` values (`block-start`, `same`, etc.) | ✅ Full | ❌ None | |
+| `float-min-wrap-block` | ✅ Full | ❌ None | Non-standard property. |
+| Text wrapping around floats | ✅ Full | ❌ None | |
+| **CSS Generated Content for Paged Media 3** | | | |
+| Footnotes (`float: footnote`) | ✅ Full | ✅ Basic | paged-with-floats: `footnote-policy: auto/line/block`; `footnote-display: block/inline`. |
+| `::footnote-call` / `::footnote-marker` | ✅ Full | ✅ Full | |
+| `@footnote` rule | ✅ Full | ✅ Full | |
+| `string-set` / `string()` | ✅ Full | ⚠️ Partial | paged-with-floats supports `first`/`last`/`start`; `first-except` currently returns an empty string. |
+| Running elements (`position: running()` / `content: element()`) | ✅ Full | ⚠️ Partial | paged-with-floats `element()` only supports the `first` style. |
+| `target-counter()` | ✅ Full | ✅ Basic | paged-with-floats requires an `attr()`-based target lookup. |
+| `target-counters()` | ✅ Full | ❌ None | |
+| `target-text()` | ✅ Full | ⚠️ Partial | paged-with-floats supports `attr()`-based lookups and a limited set of styles. |
+| `leader()` | ✅ Full | ❌ None | |
+| `content()` function | ✅ Full | ❌ None | |
+| **CSS Writing Modes 3** | | | |
+| Vertical writing, `writing-mode`, `direction`, RTL | ✅ Full | ❌ None | paged-with-floats assumes horizontal top-to-bottom text. |
+| **Other typesetting features** | | | |
+| `initial-letter` | ✅ Full | ❌ None | |
+| `repeat-on-break` (CSS Repeated Headers and Footers proposal) | ✅ Full | ❌ None | Non-standard. |
+| EPUB Adaptive Layout (`@-epubx-*`) | ✅ Full | ❌ None | Non-standard. |
+
+As far as the maintainers are aware, all major standardized CSS paged-media
+features are implemented by Vivliostyle; the gaps listed above are gaps in
+paged-with-floats rather than features missing from both engines.
 
 In short: use **Vivliostyle** for maximum standards coverage and typesetting
 fidelity; use **paged-with-floats** when the LGPL license is required and the
