@@ -1,6 +1,7 @@
 {
   "name": "paged-with-floats",
   "version": "0.9.4",
+  "packageManager": "pnpm@10.29.3",
   "description": "Fork of Paged.js: chunks up a document into paged media flows, applies print styles, and adds support for CSS page floats",
   "author": "Johannes Wilm",
   "maintainers": [
