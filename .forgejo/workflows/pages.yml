@@ -1,4 +1,4 @@
-name: Deploy demos to GitHub Pages
+name: Deploy demos to Forgejo Pages
 
 on:
   push:
@@ -9,28 +9,31 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-            - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-            - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
 
-            - name: Install dependencies
-              run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-            - name: Generate assets
-              run: pnpm run gen:assets
+      - name: Build library bundles
+        run: pnpm run build
 
-            - name: Build demo
-              run: pnpm run build:demo
+      - name: Assemble site
+        run: |
+          rm -rf _pages
+          mkdir -p _pages
+          cp -r dist _pages/dist
+          cp -r examples _pages/examples
+          cp -r assets _pages/assets
+          cp index.html _pages/index.html
 
-            - name: Deploy to Pages branch
-              run: |
-                  rm -rf _pages
-                  mkdir -p _pages
-                  cp -r dist/* _pages/
-                  cd _pages
-                  git init
-                  git config user.name "CI"
-                  git config user.email "ci@fiduswriter.org"
-                  git add -A
-                  git commit -m "Deploy demo [skip ci]"
-                  git push -f "https://${{ secrets.PAGES_TOKEN }}@git.fiduswriter.org/${{ github.repository }}.git" HEAD:pages
+      - name: Deploy to Pages branch
+        run: |
+          cd _pages
+          git init
+          git config user.name "CI"
+          git config user.email "ci@fiduswriter.org"
+          git add -A
+          git commit -m "Deploy demo [skip ci]"
+          git push -f "https://${{ secrets.PAGES_TOKEN }}@git.fiduswriter.org/${{ github.repository }}.git" HEAD:pages
