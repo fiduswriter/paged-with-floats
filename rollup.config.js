@@ -52,10 +52,10 @@ export default [
 	// pages-to-pdf is external so consumers bring their own copy and the bundle
 	// stays small.
 	{
-		input: "./src/paged.pdf.ts",
+		input: "./src/paged.ts",
 		external: ["pages-to-pdf"],
 		output: {
-			file: "./dist/paged.pdf.js",
+			file: "./dist/paged.js",
 			format: "es",
 			sourcemap: true,
 		},
@@ -64,10 +64,10 @@ export default [
 
 	// Minified public API.
 	{
-		input: "./src/paged.pdf.ts",
+		input: "./src/paged.ts",
 		external: ["pages-to-pdf"],
 		output: {
-			file: "./dist/paged.pdf.min.js",
+			file: "./dist/paged.min.js",
 			format: "es",
 			sourcemap: true,
 		},

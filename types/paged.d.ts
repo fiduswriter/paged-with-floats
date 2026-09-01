@@ -83,4 +83,4 @@ export interface HtmlToPDFOptions {
  * @returns The PDF file bytes.
  */
 export declare function htmlToPDF(html: string, options?: HtmlToPDFOptions): Promise<Uint8Array>;
-//# sourceMappingURL=paged.pdf.d.ts.map
+//# sourceMappingURL=paged.d.ts.map

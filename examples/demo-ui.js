@@ -168,7 +168,7 @@
 		{ title = document.title, onProgress, settings } = {},
 	) {
 		const { htmlToPDF, emitPdfFromPagedWindow, printHTML } =
-			await import(new URL("paged.pdf.js", bundleBase()).href);
+			await import(new URL("paged.js", bundleBase()).href);
 		if (!onProgress) {
 			return htmlToPDF(source.replace(POLYFILL_TAG_RE, ""), {
 				title,

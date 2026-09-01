@@ -8,5 +8,5 @@
 		"outDir": "./types",
 		"rootDir": "./src"
 	},
-	"include": ["src/paged.pdf.ts", "src/print.ts"]
+	"include": ["src/paged.ts", "src/print.ts"]
 }

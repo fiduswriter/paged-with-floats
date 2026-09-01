@@ -72,7 +72,7 @@ replaced incrementally.
 | `src/modules/filters/styles.ts` | new | 47 | 0 | 0 | 0.0% |
 | `src/modules/paged-media/columns.ts` | new | 220 | 0 | 0 | 0.0% |
 | `src/modules/paged-media/page-floats.ts` | new | 908 | 0 | 0 | 0.0% |
-| `src/paged.pdf.ts` | new | 153 | 0 | 0 | 0.0% |
+| `src/paged.ts` | new | 153 | 0 | 0 | 0.0% |
 | `src/print.ts` | new | 217 | 0 | 0 | 0.0% |
 | `src/types/emitter.ts` | new | 12 | 0 | 0 | 0.0% |
 | `src/types/vendor.d.ts` | new | 128 | 0 | 0 | 0.0% |
@@ -155,7 +155,7 @@ contains upstream-derived code. Update the summary numbers afterward.
 - [x] `src/modules/filters/styles.ts` — 47 lines
 - [x] `src/modules/paged-media/columns.ts` — 220 lines
 - [x] `src/modules/paged-media/page-floats.ts` — 908 lines
-- [x] `src/paged.pdf.ts` — 153 lines
+- [x] `src/paged.ts` — 153 lines
 - [x] `src/print.ts` — 217 lines
 - [x] `src/types/emitter.ts` — 12 lines
 - [x] `src/types/vendor.d.ts` — 128 lines

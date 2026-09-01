@@ -67,8 +67,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./types/paged.pdf.d.ts",
-      "default": "./dist/paged.pdf.js"
+      "types": "./types/paged.d.ts",
+      "default": "./dist/paged.js"
     }
   },
   "dependencies": {
@@ -132,15 +132,15 @@
     "url": "https://github.com/johanneswilm/paged-with-floats.git"
   },
   "files": [
-    "dist/paged.pdf.js",
-    "dist/paged.pdf.js.map",
-    "dist/paged.pdf.min.js",
-    "dist/paged.pdf.min.js.map",
+    "dist/paged.js",
+    "dist/paged.js.map",
+    "dist/paged.min.js",
+    "dist/paged.min.js.map",
     "dist/paged.polyfill.js",
     "dist/paged.polyfill.js.map",
     "dist/fonts",
-    "types/paged.pdf.d.ts",
-    "types/paged.pdf.d.ts.map",
+    "types/paged.d.ts",
+    "types/paged.d.ts.map",
     "types/print.d.ts",
     "types/print.d.ts.map",
     "LICENSE.md",

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Breaking
+
+- **The public-API bundle is renamed**: `dist/paged.pdf.js` →
+  `dist/paged.js`, `dist/paged.pdf.min.js` → `dist/paged.min.js`, and
+  `types/paged.pdf.d.ts` → `types/paged.d.ts` (the "pdf" in the name was a
+  leftover from when the bundle only wrapped the PDF export; it now carries
+  the whole public API — `printHTML`, `renderHTML`, `htmlToPDF`). The package
+  entry points are unchanged, so `import { htmlToPDF } from
+  "paged-with-floats"` keeps working.
+
 ### Added
 
 - **`leader()`** generated content for table-of-contents leaders.
