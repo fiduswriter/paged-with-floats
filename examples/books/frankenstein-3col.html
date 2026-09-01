@@ -9,7 +9,7 @@
 	margin: 18mm;
 
 	@top-center {
-		content: string(chapter);
+		content: string(chapter, first-except);
 		font-size: 9pt;
 		font-style: italic;
 		color: #444;
@@ -18,6 +18,16 @@
 		content: counter(page);
 		font-size: 9pt;
 	}
+}
+
+@page :recto {
+	margin-left: 22mm;
+	margin-right: 14mm;
+}
+
+@page :verso {
+	margin-left: 14mm;
+	margin-right: 22mm;
 }
 
 body {
@@ -57,6 +67,37 @@ h2 {
 }
 
 p { margin: 0 0 4pt 0; }
+
+.toc {
+	text-align: left;
+	margin: 12pt 0;
+}
+.toc ol {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.toc li {
+	margin: 0 0 3pt 0;
+}
+.toc a {
+	text-decoration: none;
+	color: inherit;
+}
+.toc a::after {
+	content: leader('.') target-counter(attr(href url), page);
+	font-size: 9pt;
+}
+.toc .label {
+	white-space: nowrap;
+}
+
+h2 {
+	break-before: recto;
+}
+h2 + p {
+	initial-letter: 3;
+}
 </style>
 <script src="../demo-ui.js"></script>
 <script>
@@ -71,8 +112,7 @@ p { margin: 0 0 4pt 0; }
 <p>Frankenstein;</p>
 <p>or, the Modern Prometheus</p>
 <p>by Mary Wollstonecraft (Godwin) Shelley</p>
-<p>CONTENTS</p>
-<p>Letter 1 Letter 2 Letter 3 Letter 4 Chapter 1 Chapter 2 Chapter 3 Chapter 4 Chapter 5 Chapter 6 Chapter 7 Chapter 8 Chapter 9 Chapter 10 Chapter 11 Chapter 12 Chapter 13 Chapter 14 Chapter 15 Chapter 16 Chapter 17 Chapter 18 Chapter 19 Chapter 20 Chapter 21 Chapter 22 Chapter 23 Chapter 24</p>
+<nav class="toc"></nav>
 <h2>Letter 1</h2>
 <p>_To Mrs. Saville, England._</p>
 <p>St. Petersburgh, Dec. 11th, 17—.</p>
@@ -865,5 +905,24 @@ p { margin: 0 0 4pt 0; }
 <p>“Farewell! I leave you, and in you the last of humankind whom these eyes will ever behold. Farewell, Frankenstein! If thou wert yet alive and yet cherished a desire of revenge against me, it would be better satiated in my life than in my destruction. But it was not so; thou didst seek my extinction, that I might not cause greater wretchedness; and if yet, in some mode unknown to me, thou hadst not ceased to think and feel, thou wouldst not desire against me a vengeance greater than that which I feel. Blasted as thou wert, my agony was still superior to thine, for the bitter sting of remorse will not cease to rankle in my wounds until death shall close them for ever.</p>
 <p>“But soon,” he cried with sad and solemn enthusiasm, “I shall die, and what I now feel be no longer felt. Soon these burning miseries will be extinct. I shall ascend my funeral pile triumphantly and exult in the agony of the torturing flames. The light of that conflagration will fade away; my ashes will be swept into the sea by the winds. My spirit will sleep in peace, or if it thinks, it will not surely think thus. Farewell.”</p>
 <p>He sprang from the cabin-window as he said this, upon the ice raft which lay close to the vessel. He was soon borne away by the waves and lost in darkness and distance.</p>
+<script>
+(function () {
+	const toc = document.querySelector(".toc");
+	if (!toc) return;
+	const ol = document.createElement("ol");
+	document.querySelectorAll("h2").forEach((h2, i) => {
+		const id = "chapter-" + (i + 1);
+		h2.id = id;
+		const li = document.createElement("li");
+		const a = document.createElement("a");
+		a.href = "#" + id;
+		a.innerHTML = "<span class=\"label\"></span>";
+		a.querySelector(".label").textContent = h2.textContent;
+		li.appendChild(a);
+		ol.appendChild(li);
+	});
+	toc.appendChild(ol);
+})();
+</script>
 </body>
 </html>

@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`leader()`** generated content for table-of-contents leaders.
+- **`target-counters()`** for dotted hierarchical counter references (e.g.,
+  `1.2.3`).
+- **`target-counter()` URL fragment support**: `url(#id)` targets now resolve
+  in addition to `attr(href)` lookups.
+- **`string()` `first-except`** value, completing `first`/`last`/`start`/
+  `first-except` support.
+- **Running elements** now support `element(name, last|start|first-except)`,
+  not only `first`.
+- **`box-decoration-break: clone`** for split boxes (tables, inline elements).
+- **`:recto` / `:verso` page selectors**, mapped to right/left pages.
+- **`break-before` / `break-after: column`** for explicit column breaks inside
+  manual-column pages.
+- **Text wrapping around column floats**: `float-reference: column` with
+  `float: left/right` is left to the browser's normal float behavior.
+- **`initial-letter`** drop-caps support.
+
+### Changed
+
+- **Book demos updated** to showcase the new features: asymmetric `:recto` /
+  `:verso` margins, `string(chapter, first-except)` running headers,
+  `leader()` + `target-counter()` tables of contents, and `initial-letter`
+  drop-caps in `examples/books/alice-2col.html` and
+  `examples/books/frankenstein-3col.html`; `examples/books/moby-4col.html`
+  uses a structured TOC with `target-counter()` page numbers alongside its
+  existing page-float figure.
+- **Improved `column-fill` balancing**: rows that end before a
+  `column-span: all` element are now balanced (in addition to final and
+  part-ending rows), as long as the balanced layout still fits.
+- **Running-element override behavior preserved**: a higher-specificity margin
+  rule whose running source has not appeared yet no longer clears content
+  placed by a lower-specificity rule.
+
+### Fixed
+
+- **`target-counter()` page numbers** now resolve correctly when the function
+  is used in `::after` / `::before` generated content (the counter is reset on
+  the element itself so the pseudo-element can see it).
+
 ## 0.9.0 (2026-08-28)
 
 ### Breaking

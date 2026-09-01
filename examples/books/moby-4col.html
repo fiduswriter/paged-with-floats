@@ -9,7 +9,7 @@
 	margin: 18mm;
 
 	@top-center {
-		content: string(chapter);
+		content: string(chapter, first-except);
 		font-size: 9pt;
 		font-style: italic;
 		color: #444;
@@ -18,6 +18,16 @@
 		content: counter(page);
 		font-size: 9pt;
 	}
+}
+
+@page :recto {
+	margin-left: 22mm;
+	margin-right: 14mm;
+}
+
+@page :verso {
+	margin-left: 14mm;
+	margin-right: 22mm;
 }
 
 body {
@@ -58,6 +68,30 @@ h2 {
 
 p { margin: 0 0 4pt 0; }
 
+.toc {
+	text-align: left;
+	margin: 12pt 0;
+}
+.toc ol {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.toc li {
+	margin: 0 0 3pt 0;
+}
+.toc a {
+	text-decoration: none;
+	color: inherit;
+}
+.toc a::after {
+	content: target-counter(attr(href url), page);
+	font-size: 9pt;
+}
+.toc .label {
+	white-space: nowrap;
+}
+
 /* Page floats: figures pulled to the top of the page, spanning all
    four columns, while the column text continues beneath them. */
 figure.page-float {
@@ -96,7 +130,7 @@ figure.page-float figcaption {
 	<img src="../assets/moby-dick/images/Moby-Dick_FE_title_page.jpg" alt="Title page of the first American edition of Moby-Dick">
 	<figcaption>Title page of the first American edition. New York: Harper &amp; Brothers, 1851.</figcaption>
 </figure>
-<p>CONTENTS</p>
+<nav class="toc"></nav>
 <h2>ETYMOLOGY.</h2>
 <h2>EXTRACTS (Supplied by a Sub-Sub-Librarian).</h2>
 <h2>CHAPTER 1. Loomings.</h2>
@@ -2899,5 +2933,24 @@ figure.page-float figcaption {
 <p>“AND I ONLY AM ESCAPED ALONE TO TELL THEE” Job.</p>
 <p>The drama’s done. Why then here does any one step forth?—Because one did survive the wreck.</p>
 <p>It so chanced, that after the Parsee’s disappearance, I was he whom the Fates ordained to take the place of Ahab’s bowsman, when that bowsman assumed the vacant post; the same, who, when on the last day the three men were tossed from out of the rocking boat, was dropped astern. So, floating on the margin of the ensuing scene, and in full sight of it, when the halfspent suction of the sunk ship reached me, I was then, but slowly, drawn towards the closing vortex. When I reached it, it had subsided to a creamy pool. Round and round, then, and ever contracting towards the button-like black bubble at the axis of that slowly wheeling circle, like another Ixion I did revolve. Till, gaining that vital centre, the black bubble upward burst; and now, liberated by reason of its cunning spring, and, owing to its great buoyancy, rising with great force, the coffin life-buoy shot lengthwise from the sea, fell over, and floated by my side. Buoyed up by that coffin, for almost one whole day and night, I floated on a soft and dirgelike main. The unharming sharks, they glided by as if with padlocks on their mouths; the savage sea-hawks sailed with sheathed beaks. On the second day, a sail drew near, nearer, and picked me up at last. It was the devious-cruising Rachel, that in her retracing search after her missing children, only found another orphan.</p>
+<script>
+(function () {
+	const toc = document.querySelector(".toc");
+	if (!toc) return;
+	const ol = document.createElement("ol");
+	document.querySelectorAll("h2").forEach((h2, i) => {
+		const id = "chapter-" + (i + 1);
+		h2.id = id;
+		const li = document.createElement("li");
+		const a = document.createElement("a");
+		a.href = "#" + id;
+		a.innerHTML = "<span class=\"label\"></span>";
+		a.querySelector(".label").textContent = h2.textContent;
+		li.appendChild(a);
+		ol.appendChild(li);
+	});
+	toc.appendChild(ol);
+})();
+</script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 <img style="display: block; margin: 3em auto;" src="assets/logo.svg" alt="paged-with-floats — a block floating above a paginated page"/>
 
-[![CI](https://github.com/johanneswilm/paged-with-floats/actions/workflows/ci.yml/badge.svg)](https://github.com/johanneswilm/paged-with-floats/actions/workflows/ci.yml)
+[![CI](https://github.com/fiduswriter/paged-with-floats/actions/workflows/ci.yml/badge.svg)](https://github.com/fiduswriter/paged-with-floats/actions/workflows/ci.yml)
 
-**Live demos:** <https://johanneswilm.github.io/paged-with-floats/>
+**Live demos:** <https://fiduswriter.github.io/paged-with-floats/>
 
 paged-with-floats
 ==================

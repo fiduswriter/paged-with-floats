@@ -371,9 +371,13 @@ class TargetCounters extends Handler {
 						}
 					}
 
-					// Insert CSS rule to reset the custom counter variable on the targeted element
+					// Insert CSS rule to reset the custom counter variable on the
+					// targeted element. Counters reset on a pseudo-element are not
+					// visible to counter() on that same pseudo-element, so reset on
+					// the element itself even when the target-counter() is used in
+					// ::after/::before content.
 					this.styleSheet.insertRule(
-						`[data-${target.variable}="${selector}"]${pseudo} { counter-reset: ${target.variable} ${pg}; }`,
+						`[data-${target.variable}="${selector}"] { counter-reset: ${target.variable} ${pg}; }`,
 						this.styleSheet.cssRules.length,
 					);
 				} else {
@@ -383,7 +387,7 @@ class TargetCounters extends Handler {
 					);
 					if (value) {
 						this.styleSheet.insertRule(
-							`[data-${target.variable}="${selector}"]${pseudo} { counter-reset: ${target.variable} ${target.variable} ${parseInt(value)}; }`,
+							`[data-${target.variable}="${selector}"] { counter-reset: ${target.variable} ${target.variable} ${parseInt(value)}; }`,
 							this.styleSheet.cssRules.length,
 						);
 					}
