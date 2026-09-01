@@ -7,6 +7,10 @@ interface RunningHeaderValue {
 	value?: string;
 	selector: string;
 	first?: Element;
+	last?: Element;
+	start?: Element;
+	carryFirst?: Element;
+	hasAppeared?: boolean;
 }
 
 interface RunningHeadersData {
@@ -110,7 +114,18 @@ class RunningHeaders extends Handler {
 						let func = funcNode.name;
 						let value = funcNode.children.first().name;
 						let args = [value];
-						let style = "first"; // Currently only supports 'first'
+						let style = "first";
+						let firstIdentSeen = false;
+
+						funcNode.children.forEach((child: CssNode) => {
+							if (child.type === "Identifier") {
+								if (!firstIdentSeen) {
+									firstIdentSeen = true;
+								} else {
+									style = child.name;
+								}
+							}
+						});
 
 						selector.split(",").forEach((s) => {
 							s = s.replace(/::after|::before/, "");
@@ -149,12 +164,33 @@ class RunningHeaders extends Handler {
 	afterPageLayout(fragment: HTMLElement) {
 		for (let name of Object.keys(this.runningSelectors)) {
 			let set = this.runningSelectors[name];
-			let selected = fragment.querySelector(set.selector);
-			if (selected) {
-				if (set.identifier === "running") {
-					set.first = selected;
-				} else {
-					console.warn(set.value! + " needs CSS replacement");
+			let selected = fragment.querySelectorAll(set.selector);
+
+			// Reset per-page values; carryFirst and hasAppeared persist.
+			set.first = undefined;
+			set.last = undefined;
+			set.start = undefined;
+
+			if (selected.length && set.identifier === "running") {
+				set.first = selected[0];
+				set.last = selected[selected.length - 1];
+				set.hasAppeared = true;
+
+				let pageContent = fragment.querySelector(".paged_page_content");
+				if (pageContent) {
+					let pageTop = pageContent.getBoundingClientRect().top;
+					for (let el of Array.from(selected)) {
+						if (Math.abs(el.getBoundingClientRect().top - pageTop) < 1) {
+							set.start = el;
+							break;
+						}
+					}
+				}
+				if (!set.start) {
+					set.start = set.first;
+				}
+				if (!set.carryFirst) {
+					set.carryFirst = set.first;
 				}
 			}
 		}
@@ -169,12 +205,36 @@ class RunningHeaders extends Handler {
 				let selected = fragment.querySelector(selector);
 				if (selected) {
 					let running = this.runningSelectors[el.args[0]];
-					if (running && running.first) {
-						selected.innerHTML = ""; // Clear node
-						let clone = running.first.cloneNode(true) as HTMLElement;
-						clone.style.display = null as unknown as string;
-						selected.appendChild(clone);
+					if (!running) {
+						continue;
 					}
+
+					let source: Element | undefined;
+					if (el.style === "last") {
+						source = running.last || running.carryFirst;
+					} else if (el.style === "start") {
+						source = running.start || running.carryFirst;
+					} else if (el.style === "first-except") {
+						// Empty on any page where the running source appears.
+						source = running.first ? undefined : running.carryFirst;
+					} else {
+						source = running.first || running.carryFirst;
+					}
+
+					if (!source) {
+						// first-except intentionally leaves the margin empty on pages
+						// where its running source appears; otherwise keep whatever an
+						// earlier (lower-specificity) rule already placed.
+						if (el.style === "first-except") {
+							selected.innerHTML = "";
+						}
+						continue;
+					}
+
+					selected.innerHTML = ""; // Clear node
+					let clone = source.cloneNode(true) as HTMLElement;
+					clone.style.display = null as unknown as string;
+					selected.appendChild(clone);
 				}
 			}
 		}

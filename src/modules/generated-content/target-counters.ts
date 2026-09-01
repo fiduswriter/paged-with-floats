@@ -12,6 +12,9 @@ interface CounterTargetValue {
 	selector: string;
 	fullSelector: string;
 	variable: string;
+	separator?: string;
+	plural?: boolean;
+	urlValue?: string;
 }
 
 interface CounterTargetsData {
@@ -39,10 +42,10 @@ interface ChunkerLayout {
 }
 
 /**
- * Handler for processing CSS target-counter() functions.
+ * Handler for processing CSS `target-counter()` and `target-counters()` functions.
  *
- * Parses CSS rules using target-counter(), replaces them with CSS counters,
- * and dynamically manages counter-reset rules based on page layout.
+ * Parses CSS rules using these functions, replaces them with CSS counters or
+ * custom properties, and dynamically manages values based on page layout.
  *
  * This allows counters to track values of elements targeted via attributes,
  * supporting complex page-based counters in paged media.
@@ -81,10 +84,11 @@ class TargetCounters extends Handler {
 	}
 
 	/**
-	 * Processes CSS content function nodes to detect and handle `target-counter()` functions.
-	 * Replaces the function with a CSS counter variable and stores necessary metadata.
+	 * Processes CSS content function nodes to detect and handle `target-counter()`
+	 * and `target-counters()` functions. Replaces the function with a CSS counter()
+	 * or var() call and stores necessary metadata.
 	 *
-	 * @param {Object} funcNode - The CSS function node representing `target-counter()`.
+	 * @param {Object} funcNode - The CSS function node representing `target-counter()` or `target-counters()`.
 	 * @param {Object} fItem - The current function node item (unused).
 	 * @param {Object} fList - The function list (unused).
 	 * @param {Object} declaration - The CSS declaration node.
@@ -92,74 +96,186 @@ class TargetCounters extends Handler {
 	 */
 	onContent(funcNode: CssNode, fItem: List.Cursor, fList: List, declaration: DeclarationContext, rule: RuleContext) {
 		if (funcNode.name === "target-counter") {
-			// Extract the selector for this rule
-			let selector = csstree.generate(rule.ruleNode.prelude);
+			this.handleTargetCounter(funcNode, rule);
+		} else if (funcNode.name === "target-counters") {
+			this.handleTargetCounters(funcNode, rule);
+		}
+	}
 
-			// Get the first child function name (usually attr)
-			let first = funcNode.children.first();
-			let func = first.name;
+	/**
+	 * Parses a `target-counter()` function and replaces it with a CSS `counter()` call.
+	 *
+	 * @param {Object} funcNode - The CSS function node.
+	 * @param {Object} rule - The CSS rule node containing the declaration.
+	 */
+	handleTargetCounter(funcNode: CssNode, rule: RuleContext) {
+		// Extract the selector for this rule
+		let selector = csstree.generate(rule.ruleNode.prelude);
 
-			// Full generated CSS value of the target-counter function
-			let value = csstree.generate(funcNode);
+		// Parse the target function (attr() or url())
+		let first = funcNode.children.first();
+		let targetInfo = this.parseTarget(first);
+		if (!targetInfo) {
+			return;
+		}
 
-			// Extract arguments (identifiers) for the first child function
+		// Full generated CSS value of the target-counter function
+		let value = csstree.generate(funcNode);
+
+		let counter: string | undefined, style: string | undefined, styleIdentifier: CssNode | undefined;
+
+		// Extract counter name and optional style identifier
+		funcNode.children.forEach((child: CssNode) => {
+			if (child.type === "Identifier") {
+				if (!counter) {
+					counter = child.name;
+				} else if (!style) {
+					styleIdentifier = csstree.clone(child);
+					style = child.name;
+				}
+			}
+		});
+
+		// Generate a unique CSS variable name for this counter
+		let variable = "target-counter-" + UUID();
+
+		// Support multiple selectors by splitting and adding each individually
+		selector.split(",").forEach((s) => {
+			this.counterTargets[s] = {
+				func: targetInfo!.func,
+				args: targetInfo!.args,
+				value: value,
+				counter: counter,
+				style: style,
+				selector: s,
+				fullSelector: selector,
+				variable: variable,
+				urlValue: targetInfo!.urlValue,
+			};
+		});
+
+		// Replace the original target-counter() function with a CSS counter() function
+		funcNode.name = "counter";
+		funcNode.children = new csstree.List();
+		funcNode.children.appendData({
+			type: "Identifier",
+			loc: 0,
+			name: variable,
+		});
+
+		// If a style identifier was provided, append it as a second argument
+		if (styleIdentifier) {
+			funcNode.children.appendData({
+				type: "Operator",
+				loc: null,
+				value: ",",
+			});
+			funcNode.children.appendData(styleIdentifier);
+		}
+	}
+
+	/**
+	 * Parses a `target-counters()` function and replaces it with a CSS `var()` call
+	 * referencing a generated custom property.
+	 *
+	 * @param {Object} funcNode - The CSS function node.
+	 * @param {Object} rule - The CSS rule node containing the declaration.
+	 */
+	handleTargetCounters(funcNode: CssNode, rule: RuleContext) {
+		let selector = csstree.generate(rule.ruleNode.prelude);
+
+		let first = funcNode.children.first();
+		let targetInfo = this.parseTarget(first);
+		if (!targetInfo) {
+			return;
+		}
+
+		let counter: string | undefined;
+		let separator = ".";
+		let separatorSet = false;
+		let style: string | undefined;
+
+		funcNode.children.forEach((child: CssNode) => {
+			if (child.type === "Identifier") {
+				if (!counter) {
+					counter = child.name;
+				} else if (!style) {
+					style = child.name;
+				}
+			} else if (
+				!separatorSet &&
+				(child.type === "String" || child.type === "Raw")
+			) {
+				separator = String(child.value).replace(/["']/g, "");
+				separatorSet = true;
+			}
+		});
+
+		let variable = "target-counters-" + UUID();
+
+		selector.split(",").forEach((s) => {
+			this.counterTargets[s] = {
+				func: targetInfo!.func,
+				args: targetInfo!.args,
+				value: csstree.generate(funcNode),
+				counter: counter,
+				style: style,
+				selector: s,
+				fullSelector: selector,
+				variable: variable,
+				separator: separator,
+				plural: true,
+				urlValue: targetInfo!.urlValue,
+			};
+		});
+
+		// Replace target-counters() with var(--target-counters-<uuid>)
+		funcNode.name = "var";
+		funcNode.children = new csstree.List();
+		funcNode.children.appendData({
+			type: "Identifier",
+			loc: 0,
+			name: `--${variable}`,
+		});
+	}
+
+	/**
+	 * Parses the first argument of `target-counter()` / `target-counters()`,
+	 * which may be `attr()`, `url()`, or a `Url` node.
+	 *
+	 * @param {Object} first - The first child of the function node.
+	 * @returns {Object|null} Target descriptor, or null when unsupported.
+	 */
+	parseTarget(
+		first: CssNode,
+	): { func: string; args: string[]; urlValue?: string } | null {
+		if (first.type === "Function" && first.name === "attr") {
 			let args: string[] = [];
 			first.children.forEach((child: CssNode) => {
 				if (child.type === "Identifier") {
 					args.push(child.name);
 				}
 			});
-
-			let counter: string | undefined, style: string | undefined, styleIdentifier: CssNode | undefined;
-
-			// Extract counter name and optional style identifier
-			funcNode.children.forEach((child: CssNode) => {
-				if (child.type === "Identifier") {
-					if (!counter) {
-						counter = child.name;
-					} else if (!style) {
-						styleIdentifier = csstree.clone(child);
-						style = child.name;
-					}
-				}
-			});
-
-			// Generate a unique CSS variable name for this counter
-			let variable = "target-counter-" + UUID();
-
-			// Support multiple selectors by splitting and adding each individually
-			selector.split(",").forEach((s) => {
-				this.counterTargets[s] = {
-					func: func,
-					args: args,
-					value: value,
-					counter: counter,
-					style: style,
-					selector: s,
-					fullSelector: selector,
-					variable: variable,
-				};
-			});
-
-			// Replace the original target-counter() function with a CSS counter() function
-			funcNode.name = "counter";
-			funcNode.children = new csstree.List();
-			funcNode.children.appendData({
-				type: "Identifier",
-				loc: 0,
-				name: variable,
-			});
-
-			// If a style identifier was provided, append it as a second argument
-			if (styleIdentifier) {
-				funcNode.children.appendData({
-					type: "Operator",
-					loc: null,
-					value: ",",
-				});
-				funcNode.children.appendData(styleIdentifier);
-			}
+			return { func: "attr", args: args };
 		}
+
+		if (first.type === "Function" && first.name === "url") {
+			let child = first.children.first();
+			let urlValue = child
+				? String(child.value).replace(/["']/g, "")
+				: "";
+			return { func: "url", args: [], urlValue: urlValue };
+		}
+
+		if (first.type === "Url") {
+			return {
+				func: "url",
+				args: [],
+				urlValue: String(first.value.value).replace(/["']/g, ""),
+			};
+		}
+
+		return null;
 	}
 
 	/**
@@ -184,83 +300,136 @@ class TargetCounters extends Handler {
 			);
 
 			queried.forEach((selected) => {
-				// Currently only supports `attr` function; skip others
-				if (target.func !== "attr") {
+				let element: Element | null = null;
+
+				if (target.func === "attr") {
+					let val = attr(selected, target.args);
+					element = chunker.pagesArea.querySelector(querySelectorEscape(val));
+				} else if (target.func === "url" && target.urlValue) {
+					let fragment = target.urlValue.includes("#")
+						? target.urlValue.split("#").pop()
+						: target.urlValue;
+					if (fragment) {
+						element = chunker.pagesArea.querySelector(
+							"#" + querySelectorEscape(fragment),
+						);
+					}
+				}
+
+				if (!element) {
 					return;
 				}
 
-				// Get the attribute value used for targeting
-				let val = attr(selected, target.args);
-				let element = chunker.pagesArea.querySelector(querySelectorEscape(val));
+				// Generate a unique selector id for this instance
+				let selector = UUID();
 
-				if (element) {
-					// Generate a unique selector id for this instance
-					let selector = UUID();
+				// Mark the selected element as processed
+				selected.setAttribute("data-" + target.variable, selector);
 
-					// Mark the selected element as processed
-					selected.setAttribute("data-" + target.variable, selector);
+				// Handle pseudo elements if present
+				let pseudo = "";
+				if (split.length > 1) {
+					pseudo += "::" + split[1];
+				}
 
-					// Handle pseudo elements if present
-					let pseudo = "";
-					if (split.length > 1) {
-						pseudo += "::" + split[1];
-					}
-
-					if (target.counter === "page") {
-						// Calculate page counter value by checking page resets and increments
-						let pages = chunker.pagesArea.querySelectorAll(".paged_page");
-						let pg = 0;
-						for (let i = 0; i < pages.length; i++) {
-							let page = pages[i];
-							let styles = window.getComputedStyle(page) as CSSStyleDeclaration &
-								Record<string, string>;
-							let reset = styles["counter-reset"].replace("page", "").trim();
-							let increment = styles["counter-increment"]
-								.replace("page", "")
-								.trim();
-
-							if (reset !== "none") {
-								pg = parseInt(reset);
-							}
-							if (increment !== "none") {
-								pg += parseInt(increment);
-							}
-
-							if (page.contains(element)) {
-								break;
-							}
-						}
-
-						// Insert CSS rule to reset the custom counter variable on the targeted element
+				if (target.plural) {
+					// target-counters(): collect counter values from the target up
+					// through its ancestors and join them with the separator.
+					let values = this.collectCounterValues(
+						element,
+						target.counter,
+					);
+					if (values.length) {
+						let joined = values.join(target.separator || ".");
 						this.styleSheet.insertRule(
-							`[data-${target.variable}="${selector}"]${pseudo} { counter-reset: ${target.variable} ${pg}; }`,
+							`[data-${target.variable}="${selector}"]${pseudo} { --${target.variable}: "${joined}"; }`,
 							this.styleSheet.cssRules.length,
 						);
-					} else {
-						// For other counters, get the value from a data attribute and set it
-						let value = element.getAttribute(
-							`data-counter-${target.counter}-value`,
-						);
-						if (value) {
-							this.styleSheet.insertRule(
-								`[data-${target.variable}="${selector}"]${pseudo} { counter-reset: ${target.variable} ${target.variable} ${parseInt(value)}; }`,
-								this.styleSheet.cssRules.length,
-							);
+					}
+				} else if (target.counter === "page") {
+					// Calculate page counter value by checking page resets and increments
+					let pages = chunker.pagesArea.querySelectorAll(".paged_page");
+					let pg = 0;
+					for (let i = 0; i < pages.length; i++) {
+						let page = pages[i];
+						let styles = window.getComputedStyle(page) as CSSStyleDeclaration &
+							Record<string, string>;
+						let reset = styles["counter-reset"].replace("page", "").trim();
+						let increment = styles["counter-increment"]
+							.replace("page", "")
+							.trim();
+
+						if (reset !== "none") {
+							pg = parseInt(reset);
+						}
+						if (increment !== "none") {
+							pg += parseInt(increment);
+						}
+
+						if (page.contains(element)) {
+							break;
 						}
 					}
 
-					// Force browser redraw by toggling display style
-					let el = document.querySelector(
-						`[data-${target.variable}="${selector}"]`,
-					) as HTMLElement | null;
-					if (el) {
-						el.style.display = "none";
-						el.clientHeight; // trigger reflow
-						el.style.removeProperty("display");
+					// Insert CSS rule to reset the custom counter variable on the targeted element
+					this.styleSheet.insertRule(
+						`[data-${target.variable}="${selector}"]${pseudo} { counter-reset: ${target.variable} ${pg}; }`,
+						this.styleSheet.cssRules.length,
+					);
+				} else {
+					// For other counters, get the value from a data attribute and set it
+					let value = element.getAttribute(
+						`data-counter-${target.counter}-value`,
+					);
+					if (value) {
+						this.styleSheet.insertRule(
+							`[data-${target.variable}="${selector}"]${pseudo} { counter-reset: ${target.variable} ${target.variable} ${parseInt(value)}; }`,
+							this.styleSheet.cssRules.length,
+						);
 					}
+				}
+
+				// Force browser redraw by toggling display style
+				let el = document.querySelector(
+					`[data-${target.variable}="${selector}"]`,
+				) as HTMLElement | null;
+				if (el) {
+					el.style.display = "none";
+					el.clientHeight; // trigger reflow
+					el.style.removeProperty("display");
 				}
 			});
 		});
+	}
+
+	/**
+	 * Collects counter values for `target-counters()` by walking from the
+	 * target element up through its ancestors. Values are gathered for every
+	 * element that carries a `data-counter-<name>-value` attribute, then
+	 * reversed so the outermost value comes first.
+	 *
+	 * @param {Element} element - The targeted element.
+	 * @param {string} [counter] - The counter name.
+	 * @returns {string[]} Ordered counter values, outermost first.
+	 */
+	collectCounterValues(element: Element, counter?: string): string[] {
+		if (!counter) {
+			return [];
+		}
+
+		let values: string[] = [];
+		let attrName = `data-counter-${counter}-value`;
+		let current: Element | null = element;
+
+		while (current) {
+			let value = current.getAttribute(attrName);
+			if (value) {
+				values.push(value);
+			}
+			current = current.parentElement;
+		}
+
+		return values.reverse();
 	}
 }
 

@@ -265,11 +265,11 @@ class Page {
 		}
 
 		if (pgnum % 2 !== 1) {
-			page.classList.remove("paged_left_page");
-			page.classList.add("paged_right_page");
+			page.classList.remove("paged_left_page", "paged_verso_page");
+			page.classList.add("paged_right_page", "paged_recto_page");
 		} else {
-			page.classList.remove("paged_right_page");
-			page.classList.add("paged_left_page");
+			page.classList.remove("paged_right_page", "paged_recto_page");
+			page.classList.add("paged_left_page", "paged_verso_page");
 		}
 	}
 

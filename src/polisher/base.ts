@@ -680,16 +680,15 @@ html, body {
 	display: block;
 }
 
-.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-to] {
+.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-to]:not([data-paged-box-decoration="clone"]) {
 	margin-bottom: unset;
 	padding-bottom: unset;
 }
 
-.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from] {
+.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from]:not([data-paged-box-decoration="clone"]) {
 	text-indent: unset;
 	margin-top: unset;
 	padding-top: unset;
-	initial-letter: unset;
 }
 
 .paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from] > *::first-letter,

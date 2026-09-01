@@ -926,6 +926,17 @@ class AtPage extends Handler {
 			sheet.insertRule(right);
 			pages[":right"].added = true;
 		}
+		// Add :recto & :verso
+		if (":recto" in pages && pages[":recto"].added === false) {
+			let recto = this.createPage(pages[":recto"], ast.children, sheet);
+			sheet.insertRule(recto);
+			pages[":recto"].added = true;
+		}
+		if (":verso" in pages && pages[":verso"].added === false) {
+			let verso = this.createPage(pages[":verso"], ast.children, sheet);
+			sheet.insertRule(verso);
+			pages[":verso"].added = true;
+		}
 		// Add :first & :blank
 		if (":first" in pages && pages[":first"].added === false) {
 			let first = this.createPage(pages[":first"], ast.children, sheet);

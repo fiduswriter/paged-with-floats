@@ -32,41 +32,41 @@ projects cover the CSS specifications most relevant to paged media.
 | Page selectors `:first`, `:blank`, `:nth()` | ✅ Full | ⚠️ Basic | Vivliostyle also supports `:nth(An+B of <page-type>)` page-group matching. |
 | Named pages (`page` property) | ✅ Full | ✅ Full | |
 | Page-based counters (`page`, `pages`) | ✅ Full | ✅ Full | |
-| `:recto` / `:verso` page selectors | ✅ Full | ❌ None | `recto`/`verso` *break* values are supported by paged-with-floats. |
+| `:recto` / `:verso` page selectors | ✅ Full | ✅ Full | |
 | Non-standard crop/inside-outside margin properties | ✅ Full | ❌ None | `crop-offset`, `crop-marks-line-color`, `margin-inside`/`margin-outside`, etc. |
 | **CSS Fragmentation** | | | |
-| `break-before` / `break-after` | ✅ Full | ⚠️ Partial | paged-with-floats supports `page`/`always`/`left`/`right`/`recto`/`verso` and `avoid`; not `column`/`region`. |
+| `break-before` / `break-after` | ✅ Full | ⚠️ Partial | paged-with-floats supports `page`/`always`/`left`/`right`/`recto`/`verso`, `column`, and `avoid`; not `region`. |
 | `break-inside: avoid` | ✅ Full | ✅ Basic | Vivliostyle treats `avoid-page`/`avoid-column`/`avoid-region` as `avoid`. |
-| `box-decoration-break` | ✅ Full | ❌ None | |
+| `box-decoration-break` | ✅ Full | ✅ Full | |
 | `margin-break` | ✅ Full | ❌ None | |
 | **CSS Multi-column Layout** | | | |
 | `column-count`, `columns`, `column-gap`, `column-rule-*` | ✅ Full | ✅ Full | |
 | `column-span: all` | ✅ Full | ✅ Full | Vivliostyle root multicol only spans page floats; non-root multicol is unrestricted. |
-| `column-fill` | ✅ Full | ⚠️ Partial | paged-with-floats balances only the final fragment and part-ending rows. |
+| `column-fill` | ✅ Full | ⚠️ Partial | paged-with-floats balances the final fragment, part-ending rows, and rows that end before a `column-span: all`. |
 | Nested multicol containers | ✅ Full | ❌ None | paged-with-floats degrades the inner container to one column. |
 | RTL / vertical column order | ✅ Full | ❌ None | |
 | **CSS Page Floats** | | | |
 | Basic page floats (`float-reference: page; float: top/bottom`) | ✅ Full | ⚠️ Partial | paged-with-floats stacks floats as blocks; text does not wrap around them. |
 | Logical / corner float values (`block-start`, `inline-start`, `snap-block`, combinations) | ✅ Full | ❌ None | paged-with-floats accepts `block-start`/`block-end` as aliases for top/bottom only. |
-| `float-reference: column` / `region` | ✅ Full | ❌ None | |
+| `float-reference: column` / `region` | ✅ Full | ⚠️ Partial | paged-with-floats wraps text around `float: left/right` in columns; other values are not supported. |
 | Extended `clear` values (`block-start`, `same`, etc.) | ✅ Full | ❌ None | |
 | `float-min-wrap-block` | ✅ Full | ❌ None | Non-standard property. |
-| Text wrapping around floats | ✅ Full | ❌ None | |
+| Text wrapping around page floats | ✅ Full | ❌ None | |
 | **CSS Generated Content for Paged Media 3** | | | |
 | Footnotes (`float: footnote`) | ✅ Full | ✅ Basic | paged-with-floats: `footnote-policy: auto/line/block`; `footnote-display: block/inline`. |
 | `::footnote-call` / `::footnote-marker` | ✅ Full | ✅ Full | |
 | `@footnote` rule | ✅ Full | ✅ Full | |
-| `string-set` / `string()` | ✅ Full | ⚠️ Partial | paged-with-floats supports `first`/`last`/`start`; `first-except` currently returns an empty string. |
-| Running elements (`position: running()` / `content: element()`) | ✅ Full | ⚠️ Partial | paged-with-floats `element()` only supports the `first` style. |
-| `target-counter()` | ✅ Full | ✅ Basic | paged-with-floats requires an `attr()`-based target lookup. |
-| `target-counters()` | ✅ Full | ❌ None | |
+| `string-set` / `string()` | ✅ Full | ✅ Full | paged-with-floats supports `first`/`last`/`start`/`first-except`. |
+| Running elements (`position: running()` / `content: element()`) | ✅ Full | ✅ Full | paged-with-floats supports `first`/`last`/`start`/`first-except`. |
+| `target-counter()` | ✅ Full | ✅ Full | paged-with-floats supports `attr()` and `url()` target lookups. |
+| `target-counters()` | ✅ Full | ✅ Full | |
 | `target-text()` | ✅ Full | ⚠️ Partial | paged-with-floats supports `attr()`-based lookups and a limited set of styles. |
-| `leader()` | ✅ Full | ❌ None | |
+| `leader()` | ✅ Full | ✅ Full | |
 | `content()` function | ✅ Full | ❌ None | |
 | **CSS Writing Modes 3** | | | |
 | Vertical writing, `writing-mode`, `direction`, RTL | ✅ Full | ❌ None | paged-with-floats assumes horizontal top-to-bottom text. |
 | **Other typesetting features** | | | |
-| `initial-letter` | ✅ Full | ❌ None | |
+| `initial-letter` | ✅ Full | ✅ Full | |
 | `repeat-on-break` (CSS Repeated Headers and Footers proposal) | ✅ Full | ❌ None | Non-standard. |
 | EPUB Adaptive Layout (`@-epubx-*`) | ✅ Full | ❌ None | Non-standard. |
 

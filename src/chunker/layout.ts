@@ -342,16 +342,16 @@ export function rebalanceMulticolFinals(
 }
 
 /**
- * Re-balances the final row of root-level manual columns.
+ * Re-balances root-level manual column rows that end early.
  *
  * Manual columns are filled sequentially by the layout engine. On a page
- * whose content ends early — the document's last page, or a page that ends
- * a part (a forced page break or a deferred `column-span: all` heading
- * follows, marked `data-paged-part-end` by the walk) — this often leaves
- * the right-hand columns nearly empty while the left-hand column holds the
- * remaining content. When the author asked for `column-fill: balance` (the
- * CSS default), such final rows are converted back into a native CSS
- * multi-column container for that page only; the browser then distributes
+ * whose content ends early — the document's last page, a page that ends a
+ * part (a forced page break, marked `data-paged-part-end` by the walk), or
+ * a row that is terminated by a `column-span: all` element — this often
+ * leaves the right-hand columns nearly empty while the left-hand column
+ * holds the remaining content. When the author asked for `column-fill:
+ * balance` (the CSS default), such rows are converted back into a native
+ * CSS multi-column container for that row only; the browser then distributes
  * the remaining content evenly. If balancing would re-introduce overflow,
  * the row is left in its sequential layout.
  *
@@ -384,31 +384,44 @@ export function rebalanceManualColumnFinals(
 	}
 
 	let rebalanced = 0;
-	for (const page of candidatePages) {
+	for (const page of pages) {
 		const rows = Array.from(
 			page.querySelectorAll<HTMLElement>(
 				":scope .paged_flow > .paged_columns",
 			),
 		);
-		const row = rows[rows.length - 1];
-		if (!row || !row.hasChildNodes()) {
-			continue;
-		}
+		for (let i = 0; i < rows.length; i++) {
+			const isLastRow = i === rows.length - 1;
+			if (isLastRow && !candidatePages.has(page)) {
+				continue;
+			}
 
-		const columns = Array.from(
-			row.querySelectorAll<HTMLElement>(":scope > .paged_column"),
-		);
-		if (columns.length <= 1) {
-			continue;
-		}
+			const row = rows[i];
+			if (!row.hasChildNodes()) {
+				continue;
+			}
 
-		const fill = row.dataset.pagedColumnFill || "balance";
-		if (fill === "auto") {
-			continue;
-		}
+			const columns = Array.from(
+				row.querySelectorAll<HTMLElement>(":scope > .paged_column"),
+			);
+			if (columns.length <= 1) {
+				continue;
+			}
 
-		if (balanceManualColumnRow(row, columns)) {
-			rebalanced++;
+			const fill = row.dataset.pagedColumnFill || "balance";
+			if (fill === "auto") {
+				continue;
+			}
+
+			// Completed rows (those followed by a column-span or another row)
+			// must not grow past their already-allocated height, otherwise they
+			// would overlap the content that follows them on the same page.
+			const maxBottom = isLastRow
+				? undefined
+				: row.getBoundingClientRect().bottom;
+			if (balanceManualColumnRow(row, columns, maxBottom)) {
+				rebalanced++;
+			}
 		}
 	}
 	return rebalanced;
@@ -421,11 +434,13 @@ export function rebalanceManualColumnFinals(
  *
  * @param row - The `.paged_columns` row to balance.
  * @param columns - The row's column boxes.
+ * @param maxBottom - Optional bottom boundary the balanced row must not cross.
  * @returns True when the row was left balanced.
  */
 function balanceManualColumnRow(
 	row: HTMLElement,
 	columns: HTMLElement[],
+	maxBottom?: number,
 ): boolean {
 	const savedRowStyles = {
 		display: row.style.display,
@@ -452,7 +467,10 @@ function balanceManualColumnRow(
 	row.style.display = "block";
 	row.style.height = "auto";
 	row.style.minHeight = "0";
-	row.style.flex = "";
+	// The row is still a flex item inside .paged_flow; keep it from growing
+	// past its balanced content height, otherwise the flex container would
+	// force it taller and re-introduce overflow.
+	row.style.flex = "0 0 auto";
 	row.style.columnCount = String(columns.length);
 	row.style.columnGap = gap;
 	row.style.columnFill = "balance";
@@ -482,11 +500,13 @@ function balanceManualColumnRow(
 	const pageBottom = pageContent
 		? pageContent.getBoundingClientRect().bottom
 		: Infinity;
+	const bottomLimit =
+		maxBottom !== undefined ? Math.min(maxBottom, pageBottom) : pageBottom;
 	const rowRect = row.getBoundingClientRect();
 	const spills =
 		row.scrollWidth > row.clientWidth + COLUMN_EPSILON ||
 		row.scrollHeight > row.clientHeight + COLUMN_EPSILON ||
-		rowRect.bottom > pageBottom + COLUMN_EPSILON;
+		rowRect.bottom > bottomLimit + COLUMN_EPSILON;
 
 	if (spills) {
 		row.style.display = savedRowStyles.display;
@@ -2522,6 +2542,37 @@ class Layout {
 	}
 
 	/**
+	 * True when a node carries a forced column break (break-before: column or
+	 * the propagated break-after: column from the previous sibling).
+	 */
+	private needsColumnBreak(node: Node): boolean {
+		const el = node as HTMLElement;
+		if (!el.dataset) {
+			return false;
+		}
+		return (
+			el.dataset.breakBefore === "column" ||
+			el.dataset.previousBreakAfter === "column"
+		);
+	}
+
+	/**
+	 * True when a manual column box already holds rendered content.
+	 * Empty text nodes and scaffolding are ignored.
+	 */
+	private columnHasContent(column: HTMLElement): boolean {
+		for (const child of Array.from(column.childNodes)) {
+			if (child.nodeType === Node.TEXT_NODE && child.textContent?.trim()) {
+				return true;
+			}
+			if (child.nodeType === Node.ELEMENT_NODE) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Page content bounds, re-measured at most once per mutation batch.
 	 *
 	 * Appending a node only matters geometrically when something later
@@ -3016,6 +3067,31 @@ class Layout {
 					);
 					this.relaxFinalSegmentRow(wrapper);
 					return new RenderResult(newBreakToken);
+				}
+			}
+
+			// Handle break-before/after: column inside a manual-column page.
+			// The break is applied before appending the affected node, moving it
+			// (and its rebuilt ancestor chain) to the next column. When already
+			// in the last column, the break is promoted to a page break.
+			if (
+				node &&
+				columns.length > 1 &&
+				this.needsColumnBreak(node) &&
+				this.columnHasContent(dest)
+			) {
+				if (colIndex < columns.length - 1) {
+					dest = this.advanceColumn(
+						columns,
+						colIndex,
+						new BreakToken(node),
+						prevPage as HTMLElement | null,
+					);
+					colIndex++;
+					bounds = this.refreshBounds();
+				} else {
+					// Promote the column break to a page break.
+					forcedBreakQueue.push(node);
 				}
 			}
 

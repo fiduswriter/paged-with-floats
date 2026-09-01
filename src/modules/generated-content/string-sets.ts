@@ -225,7 +225,8 @@ class StringSets extends Handler {
 					varStart = stringPrevPage;
 				}
 
-				// FIRST EXCEPT — currently empty string, can be implemented as needed
+				// FIRST EXCEPT — empty on the page where the value is assigned,
+					// otherwise identical to first (carried forward from the previous page).
 				varFirstExcept = "";
 			}
 
