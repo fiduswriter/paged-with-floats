@@ -352,7 +352,7 @@ class Previewer {
 		// ignore them or act on them; only a summary goes to the console.
 		flow.warnings = collectRenderWarnings(this.chunker.pagesArea);
 		if (flow.warnings.length) {
-			console.info(
+			console.warn(
 				`paged-with-floats: ${flow.warnings.length} rendering warning(s) ` +
 					"(available on flow.warnings)",
 			);

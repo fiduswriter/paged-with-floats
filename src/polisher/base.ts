@@ -456,7 +456,7 @@ export default `
 
 /* Emergency word breaking: a word wider than its column is broken at an
    arbitrary character instead of protruding into the neighbouring column
-   (the analogue of TeX's last-resort \emergency{\hbox} handling). This only
+   (the analogue of TeX's last-resort emergency box handling). This only
    activates when a word cannot fit on a line by itself; ordinary text and
    linguistic hyphenation are unaffected. */
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow,

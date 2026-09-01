@@ -106,8 +106,8 @@ Key invariants to keep in mind when touching `layout.ts`:
 - TypeScript in `src/`, plain JS in `specs/`.
 - Indent with tabs; semicolons required; `console.warn`/`console.error` only
   (no `console.log`).
-- Comments are `/** ... */` JSDoc style; the lint config emits JSDoc warnings
-  but they are not errors.
+- Comments are `/** ... */` JSDoc style; JSDoc completeness is not linted
+  (the `valid-jsdoc` rule is off).
 - Commit messages are short, lowercase, imperative sentences
   (e.g. "don't state page to be finished before being done with the last
   column").

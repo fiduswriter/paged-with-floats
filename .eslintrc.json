@@ -76,14 +76,12 @@
         "prefer-rest-params": "off",
         "no-unused-expressions": "off",
         "@typescript-eslint/no-unused-expressions": "off",
-        "no-mixed-spaces-and-tabs": [
-            "error",
-            "smart-tabs"
-        ],
-        "valid-jsdoc": [
-            "warn"
-        ]
-    },
+		"no-mixed-spaces-and-tabs": [
+			"error",
+			"smart-tabs"
+		],
+		"valid-jsdoc": "off"
+	},
     "overrides": [
         {
             "files": [
