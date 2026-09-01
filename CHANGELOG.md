@@ -20,6 +20,13 @@
 - **Text wrapping around column floats**: `float-reference: column` with
   `float: left/right` is left to the browser's normal float behavior.
 - **`initial-letter`** drop-caps support.
+- **Rendering warnings** are returned to the client as `flow.warnings`:
+  words that received an engine-inserted hyphen at a break point, and
+  content protruding into the margin within the tolerance limit. The client
+  application can ignore these notices or act on them.
+- **Emergency word breaking**: words wider than their column are broken at
+  an arbitrary character (`overflow-wrap: break-word` on column content)
+  instead of protruding into the neighbouring column.
 
 ### Changed
 
@@ -36,12 +43,44 @@
 - **Running-element override behavior preserved**: a higher-specificity margin
   rule whose running source has not appeared yet no longer clears content
   placed by a lower-specificity rule.
+- **The Malay Archipelago demo** (`examples/multicol-floats.html`) extended
+  with the contents overview, reception and influence sections plus three
+  public-domain engravings from the 1869 first edition (Wikimedia Commons).
 
 ### Fixed
 
 - **`target-counter()` page numbers** now resolve correctly when the function
   is used in `::after` / `::before` generated content (the counter is reset on
   the element itself so the pseudo-element can see it).
+- **Chapters with `break-before: recto` now start on right-hand pages**
+  reliably: page starts that begin at inter-element whitespace no longer skip
+  the forced break, deferred `column-span` headings keep their side break,
+  and the chunker consults the queued break node (falling back through the
+  token node and the overflow node) when deciding whether blank verso pages
+  are needed.
+- **`break-before` / `break-after` side values no longer produce extra blank
+  pages**: queued side breaks are not consulted while the token still carries
+  overflow content to render, the forced-break queue is not carried across
+  pages (the walk re-encounters queued nodes), and a side break on an empty
+  page whose side already matches is satisfied in place.
+- **"Unable to layout item" stalls** from vacuous break-token equality: the
+  forced-break queue length now participates in token comparison.
+- **Long lists fragmented across columns keep document order**: rebuilt
+  overflow fragments are re-sorted by source position, and containers with
+  interleaved text are left untouched by the reordering pass.
+- **Height-probe leftovers no longer suppress generated content**: the
+  `[data-split-to]` / `[data-split-from]` `::after`/`::before` suppression
+  skips temporary (`temp-*`) split markers, so TOC entries keep their
+  `target-counter()` page numbers.
+- **Post-render audit accuracy**: images are awaited before the overflow
+  audit runs, and the residual sweep clears stale range markers so overflow
+  introduced by late-loading page floats is detected and extracted.
+- **Initial-letter drop caps reserve their float height**: the avoid-adjacency
+  check for `column-span` headings accounts for the drop cap's line count, so
+  a heading plus its drop-cap paragraph are never squeezed onto a page tail.
+- **Text-align-last / forced page break fixtures** no longer stall the
+  renderer (`break-after: page` tokens end the page instead of advancing a
+  column and losing the break).
 
 ## 0.9.0 (2026-08-28)
 

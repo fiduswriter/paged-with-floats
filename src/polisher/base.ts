@@ -454,6 +454,16 @@ export default `
 	height: 100%;
 }
 
+/* Emergency word breaking: a word wider than its column is broken at an
+   arbitrary character instead of protruding into the neighbouring column
+   (the analogue of TeX's last-resort \emergency{\hbox} handling). This only
+   activates when a word cannot fit on a line by itself; ordinary text and
+   linguistic hyphenation are unaffected. */
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow,
+.paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_columns > .paged_column {
+	overflow-wrap: break-word;
+}
+
 .paged_pagebox > .paged_area > .paged_page_content > .paged_flow > .paged_float_spacer {
 	height: auto;
 	flex: 0 0 auto;
@@ -704,13 +714,13 @@ html, body {
 	margin: unset;
 }
 
-.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-to]:not([data-footnote-call]):after,
-.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-to]:not([data-footnote-call])::after {
+.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-to]:not([data-footnote-call]):not([data-split-to^="temp-"]):after,
+.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-to]:not([data-footnote-call]):not([data-split-to^="temp-"])::after {
 	content: unset;
 }
 
-.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from]:not([data-footnote-call]):before,
-.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from]:not([data-footnote-call])::before {
+.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from]:not([data-footnote-call]):not([data-split-from^="temp-"]):before,
+.paged_pages > .paged_page > .paged_sheet > .paged_pagebox > .paged_area > div [data-split-from]:not([data-footnote-call]):not([data-split-from^="temp-"])::before {
 	content: unset;
 }
 

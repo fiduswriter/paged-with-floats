@@ -4,7 +4,14 @@ import Hook from "../utils/hook.js";
 import Chunker from "../chunker/chunker.js";
 import Polisher from "../polisher/polisher.js";
 import type { PolisherHooks } from "../polisher/polisher.js";
-import { validateRenderedPages, rebalanceMulticolFinals, rebalanceManualColumnFinals, type OverflowViolation } from "../chunker/layout.js";
+import {
+	validateRenderedPages,
+	collectRenderWarnings,
+	rebalanceMulticolFinals,
+	rebalanceManualColumnFinals,
+	type OverflowViolation,
+	type RenderWarning,
+} from "../chunker/layout.js";
 import type Page from "../chunker/page.js";
 
 import { initializeHandlers, registerHandlers } from "../utils/handlers.js";
@@ -30,6 +37,8 @@ export type FlowResult = Chunker & {
 	size?: Size;
 	/** Pages with content outside its designated space (post-render audit). */
 	overflowViolations?: OverflowViolation[];
+	/** Non-fatal rendering notices (sub-tolerance protrusions, hyphenation). */
+	warnings?: RenderWarning[];
 };
 
 /**
@@ -307,6 +316,25 @@ class Previewer {
 		rebalanceMulticolFinals(this.chunker.pagesArea);
 		rebalanceManualColumnFinals(this.chunker.pagesArea);
 
+		// Let every image finish loading and layout before auditing: a float
+		// figure whose image completes after its page was filled changes the
+		// column heights, and auditing against the in-flight geometry would
+		// report spills that no longer exist (or miss live ones).
+		await Promise.all(
+			Array.from(
+				(this.chunker.pagesArea || document).querySelectorAll("img"),
+			).map((img) =>
+				img.complete
+					? Promise.resolve()
+					: new Promise<void>((resolve) => {
+							img.addEventListener("load", () => resolve(), { once: true });
+							img.addEventListener("error", () => resolve(), { once: true });
+						}),
+			),
+		);
+		// One frame for the browser to lay out the settled images.
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+
 		flow.performance = endTime - startTime;
 		flow.size = this.size;
 
@@ -316,6 +344,17 @@ class Previewer {
 				`paged-with-floats: ${flow.overflowViolations.length} page(s) contain ` +
 					"content outside its designated space",
 				flow.overflowViolations.slice(0, 5),
+			);
+		}
+
+		// Non-fatal notices: sub-tolerance margin protrusions and words
+		// hyphenated at break points. Returned to the client, which can
+		// ignore them or act on them; only a summary goes to the console.
+		flow.warnings = collectRenderWarnings(this.chunker.pagesArea);
+		if (flow.warnings.length) {
+			console.info(
+				`paged-with-floats: ${flow.warnings.length} rendering warning(s) ` +
+					"(available on flow.warnings)",
 			);
 		}
 

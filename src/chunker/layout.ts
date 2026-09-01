@@ -233,6 +233,114 @@ export interface OverflowViolation {
 	detail: string;
 }
 
+export interface RenderWarning {
+	/** Hyphenation: a word was broken mid-word with an inserted hyphen glyph. */
+	kind: "hyphenation" | "sub-tolerance-spill";
+	/** Page number of the page the event occurred on, when known. */
+	page?: string;
+	detail: string;
+}
+
+/**
+ * Mid-word hyphenation events per page number, recorded while paginating
+ * and materialized into warnings by collectRenderWarnings.
+ */
+const hyphenationEvents = new Map<string, number>();
+
+/**
+ * Records that a word on a page received an engine-inserted hyphen at a
+ * break point (as opposed to linguistic hyphenation rendered by the browser).
+ *
+ * @param page - Page number the event occurred on, when known.
+ */
+export function recordHyphenationWarning(page?: string): void {
+	const key = page || "-";
+	hyphenationEvents.set(key, (hyphenationEvents.get(key) || 0) + 1);
+}
+
+/**
+ * Collects non-fatal rendering notices for the client application:
+ * - sub-tolerance protrusions: content that extends into the page margin by
+ *   a few pixels (within OVERFLOW_TOLERANCE) — not reported as a violation,
+ *   but worth surfacing;
+ * - hyphenation: words broken mid-word with an inserted hyphen glyph.
+ * The client can ignore these or act on them (rewording, tracking, etc.).
+ * Drains the recorded hyphenation events; call once per completed flow.
+ *
+ * @param pagesArea - The element containing all rendered pages.
+ * @returns Warnings accumulated during the flow.
+ */
+export function collectRenderWarnings(
+	pagesArea?: HTMLElement | null,
+): RenderWarning[] {
+	const warnings: RenderWarning[] = [];
+
+	// Sub-tolerance protrusions.
+	if (pagesArea) {
+		const pages = pagesArea.querySelectorAll(".paged_page");
+		pages.forEach((pg) => {
+			const content = pg.querySelector(
+				".paged_page_content",
+			) as HTMLElement | null;
+			const wrapper = content?.querySelector(
+				":scope > div:not(.paged_float_top):not(.paged_float_bottom)",
+			) as HTMLElement | null;
+			if (!wrapper) {
+				return;
+			}
+			const columns = wrapper.querySelectorAll(
+				":scope > .paged_columns > .paged_column",
+			);
+			const containers = columns.length
+				? (Array.from(columns) as HTMLElement[])
+				: [wrapper];
+			for (const container of containers) {
+				const hProtrusion = container.scrollWidth - container.clientWidth;
+				if (hProtrusion > 0 && hProtrusion <= OVERFLOW_TOLERANCE) {
+					warnings.push({
+						kind: "sub-tolerance-spill",
+						page: pg.dataset.pageNumber,
+						detail:
+							`content protrudes horizontally by ${hProtrusion}px ` +
+							"(within tolerance)",
+					});
+				}
+				const vProtrusion = container.scrollHeight - container.clientHeight;
+				if (vProtrusion > 0 && vProtrusion <= OVERFLOW_TOLERANCE) {
+					warnings.push({
+						kind: "sub-tolerance-spill",
+						page: pg.dataset.pageNumber,
+						detail:
+							`content protrudes vertically by ${vProtrusion}px ` +
+							"(within tolerance)",
+					});
+				}
+			}
+		});
+	}
+
+	// Hyphenation events, aggregated per page.
+	const pageNumbers = Array.from(hyphenationEvents.keys()).sort((a, b) => {
+		const na = a === "-" ? Number.MAX_SAFE_INTEGER : Number(a);
+		const nb = b === "-" ? Number.MAX_SAFE_INTEGER : Number(b);
+		return na - nb;
+	});
+	for (const key of pageNumbers) {
+		const count = hyphenationEvents.get(key)!;
+		warnings.push({
+			kind: "hyphenation",
+			page: key === "-" ? undefined : key,
+			detail:
+				count === 1
+					? "1 word was hyphenated at a break point"
+					: count + " words were hyphenated at break points",
+		});
+	}
+	hyphenationEvents.clear();
+
+	return warnings;
+}
+
 /**
  * Audits finished pages for content that ended up outside the space
  * designated for it.
@@ -2527,15 +2635,58 @@ class Layout {
 	 * @param {HTMLElement|null} prevPage - Previous page content.
 	 * @returns {HTMLElement} The new active column.
 	 */
+	/**
+	 * The first side-relevant break value (left/right/recto/verso) carried by
+	 * a node's break-before or previous-break-after, if any. Plain page or
+	 * always breaks impose no side requirement.
+	 *
+	 * @param {Node|null|undefined} node - The node to inspect.
+	 * @returns {string|null} The side value, or null when there is none.
+	 */
+	private sideBreakValue(node: Node | null | undefined): string | null {
+		const el = node as HTMLElement | null;
+		if (!el || typeof el.dataset === "undefined") {
+			return null;
+		}
+		for (const v of [el.dataset.breakBefore, el.dataset.previousBreakAfter]) {
+			if (v === "left" || v === "right" || v === "recto" || v === "verso") {
+				return v;
+			}
+		}
+		return null;
+	}
+
+	private isForcedBreakToken(token: BreakToken): boolean {
+		if (token.getForcedBreakQueue().length) {
+			return true;
+		}
+		if (this.sideBreakValue(token.node)) {
+			return true;
+		}
+		// A plain page break on the token node also ends the page: advancing
+		// a column would continue the walk past the node and drop the break.
+		const el = token.node as HTMLElement | null;
+		if (!el || typeof el.dataset === "undefined") {
+			return false;
+		}
+		for (const v of [el.dataset.breakBefore, el.dataset.previousBreakAfter]) {
+			if (v === "page" || v === "always") {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private advanceColumn(
 		columns: HTMLElement[],
 		colIndex: number,
 		token: BreakToken,
 		prevPage: HTMLElement | null,
+		source?: DocumentFragment | Node,
 	): HTMLElement {
 		const next = columns[colIndex + 1];
 		this.setActiveColumn(next);
-		this.addOverflowToPage(next, token, prevPage || undefined);
+		this.addOverflowToPage(next, token, prevPage || undefined, source);
 		this.clearOverflowTags(next);
 		this.registerFragmentainers(next);
 		return next;
@@ -2881,6 +3032,7 @@ class Layout {
 			dest,
 			breakToken,
 			prevPage as HTMLElement | undefined,
+			source,
 		);
 
 		// Reserve space for the footnotes this page will extract before any
@@ -2920,13 +3072,18 @@ class Layout {
 		if (
 			newBreakToken &&
 			!newBreakToken.isFinished() &&
-			colIndex < columns.length - 1
+			colIndex < columns.length - 1 &&
+			// A token carrying a forced break must end the page: the queued
+			// node was already yielded by the walker, and advancing a column
+			// would continue the walk past it, skipping the break entirely.
+			!this.isForcedBreakToken(newBreakToken)
 		) {
 			dest = this.advanceColumn(
 				columns,
 				colIndex,
 				newBreakToken,
 				prevPage as HTMLElement | null,
+				source,
 			);
 			colIndex++;
 			bounds = this.refreshBounds();
@@ -2940,6 +3097,9 @@ class Layout {
 		this.planSegmentHeights(wrapper, source, start);
 
 		let hasRenderedContent = Array.from(wrapper.childNodes).some((child) => {
+			if (child.nodeType === Node.TEXT_NODE) {
+				return !!child.textContent?.trim();
+			}
 			if (!(child instanceof HTMLElement)) {
 				return true;
 			}
@@ -2949,12 +3109,19 @@ class Layout {
 			return (
 				!child.classList.contains("paged_float_top") &&
 				!child.classList.contains("paged_float_bottom") &&
-				!child.classList.contains("paged_float_spacer")
+				!child.classList.contains("paged_float_spacer") &&
+				!child.classList.contains("paged_columns")
 			);
 		});
 
 		if (prevBreakToken) {
-			forcedBreakQueue = prevBreakToken.getForcedBreakQueue();
+			// The forced-break queue does NOT carry across pages: queued nodes
+			// always sit after the token node / overflow start in source order,
+			// so this page's walk re-encounters them and re-queues them if the
+			// break is still pending. Carrying the queue would re-fire the
+			// break at the top of the page — before the rebuilt overflow
+			// content has rendered — stranding it on a blank page.
+			forcedBreakQueue = [];
 		}
 
 		let mainLoopGuard = 0;
@@ -2985,18 +3152,38 @@ class Layout {
 				// Remember the node but don't apply the break until we have laid
 				// out the rest of any parent content - this lets a table or divs
 				// side by side still add content to this page before we start a new
-				// one.
-				if (this.shouldBreak(node) && hasRenderedContent) {
-					forcedBreakQueue.push(node);
-					// The page now ends a part: a forced page break follows.
-					// Marked for the post-flow column balancer, which
-					// balances the final row of every part-ending page (not
-					// just the document's last page).
-					const pageEl = this.element.closest(
-						".paged_page",
-					) as HTMLElement | null;
-					if (pageEl) {
-						pageEl.dataset.pagedPartEnd = "true";
+				// one. The break is only skipped when this node itself starts the
+				// page (the break was honored by the page break that produced this
+				// token) or the page is still empty and either the break carries
+				// no side requirement (a plain page break at an empty page is a
+				// no-op) or the current page's side already satisfies it (a
+				// left break on a left page renders right here). A side break on
+				// an empty page with a mismatching side must still fire — e.g. a
+				// recto chapter heading reached on a fresh verso page.
+				if (this.shouldBreak(node)) {
+					const side = this.sideBreakValue(node);
+					let doBreak = hasRenderedContent;
+					if (!doBreak && side && node !== start && start !== undefined) {
+						const pageEl = this.element.closest(
+							".paged_page",
+						) as HTMLElement | null;
+						doBreak = !(
+							pageEl &&
+							pageEl.classList.contains("paged_" + side + "_page")
+						);
+					}
+					if (doBreak) {
+						forcedBreakQueue.push(node);
+						// The page now ends a part: a forced page break follows.
+						// Marked for the post-flow column balancer, which
+						// balances the final row of every part-ending page (not
+						// just the document's last page).
+						const pageEl = this.element.closest(
+							".paged_page",
+						) as HTMLElement | null;
+						if (pageEl) {
+							pageEl.dataset.pagedPartEnd = "true";
+						}
 					}
 				}
 
@@ -3022,12 +3209,109 @@ class Layout {
 			// segment (migrateShrunkenSegmentOverflow runs when the span
 			// opens) — only defer the span when the segment's last column is
 			// full, in which case the overflow must go to the next page.
-			if (this.isColumnSpan(node) && columns.length > 1) {
+			// A span with a pending forced break (e.g. break-before: recto,
+			// queued above) is not absorbed here: the queued break goes to the
+			// check phase below, the page breaks first, and the span renders
+			// at the top of the next page — whose side the chunker fixes up.
+			if (
+				this.isColumnSpan(node) &&
+				columns.length > 1 &&
+				!forcedBreakQueue.includes(node!)
+			) {
 				const hasOverflow = this.hasOverflow(
 					dest,
 					this.refreshBounds(),
 				);
-				const defer = this.shouldDeferColumnSpan(wrapper, node!);
+				let defer = this.shouldDeferColumnSpan(wrapper, node!);
+				if (!defer) {
+					// A span whose following block must stay adjacent
+					// (break-after: avoid on the span, or the next node marked
+					// to follow it) must not be absorbed at the very bottom of
+					// the page: with no room left for the next block it would
+					// sit alone above an empty segment row, splitting the
+					// avoid-pair across the page break.
+					const spanEl = node as HTMLElement;
+					// The following block: skip inter-element whitespace so the
+					// avoid check and the initial-letter detection see it.
+					let nextNode = nodeAfter(
+						node!,
+						source,
+						false,
+						false,
+					) as HTMLElement | null;
+					while (
+						nextNode &&
+						nextNode.nodeType === Node.TEXT_NODE &&
+						!nextNode.textContent?.trim()
+					) {
+						nextNode = nodeAfter(
+							nextNode,
+							source,
+							false,
+							false,
+						) as HTMLElement | null;
+					}
+					const avoidAfter =
+						spanEl.dataset.breakAfter === "avoid" ||
+						!!(
+							nextNode &&
+							nextNode.dataset &&
+							nextNode.dataset.previousBreakAfter === "avoid"
+						);
+					if (avoidAfter) {
+						const lastRow = wrapper.querySelector(
+							":scope > .paged_columns:last-of-type",
+						) as HTMLElement | null;
+						if (lastRow) {
+							const cols = Array.from(
+								lastRow.querySelectorAll<HTMLElement>(
+									":scope > .paged_column",
+								),
+							);
+							const contentHeight = cols.length
+								? Math.max(...cols.map((c) => c.scrollHeight))
+								: 0;
+							const remaining =
+								wrapper.getBoundingClientRect().bottom -
+								(lastRow.getBoundingClientRect().top + contentHeight);
+							const ctx = { maxLine: 0, maxMargin: 0 };
+							const spanHeight = this.estimateFlowBlockHeight(
+								spanEl,
+								wrapper.getBoundingClientRect().width,
+								ctx,
+							);
+							const line = ctx.maxLine || 16;
+							// The following block may open with an initial-letter
+							// float (drop cap) taller than a text line: its first
+							// line box spans the float's height, so the room
+							// needed below the span is larger than one line.
+							let need = line;
+							const floatSpan = nextNode?.querySelector?.(
+								".paged_initial_letter",
+							) as HTMLElement | null;
+							if (floatSpan && nextNode) {
+								const lines = parseFloat(
+									floatSpan.dataset.pagedInitialLetterLines || "0",
+								);
+								if (lines > 0) {
+									const nextCtx = { maxLine: 0, maxMargin: 0 };
+									this.estimateFlowBlockHeight(
+										nextNode,
+										wrapper.getBoundingClientRect().width,
+										nextCtx,
+									);
+									need = Math.max(
+										need,
+										lines * (nextCtx.maxLine || line),
+									);
+								}
+							}
+							if (remaining < spanHeight + need + 2 * COLUMN_EPSILON) {
+								defer = true;
+							}
+						}
+					}
+				}
 				const canAbsorb =
 					(!hasOverflow || colIndex < columns.length - 1) && !defer;
 				if (canAbsorb) {
@@ -3059,13 +3343,19 @@ class Layout {
 						pageEl.dataset.pagedPartEnd = "true";
 					}
 					newBreakToken = this.breakAt(node!, 0);
+					// Relax the final segment row's planned height BEFORE the
+					// sweep: with the span deferred, the planned height (which
+					// assumed the span would open another segment on this page)
+					// is stale. The flex row re-fits the remaining page space,
+					// columns shrink, and the sweep must measure the final
+					// boxes or it leaves content spilling below them.
+					this.relaxFinalSegmentRow(wrapper);
 					this.sweepResidualColumnOverflow(
 						wrapper,
 						source,
 						newBreakToken,
 						prevBreakToken,
 					);
-					this.relaxFinalSegmentRow(wrapper);
 					return new RenderResult(newBreakToken);
 				}
 			}
@@ -3086,6 +3376,7 @@ class Layout {
 						colIndex,
 						new BreakToken(node),
 						prevPage as HTMLElement | null,
+						source,
 					);
 					colIndex++;
 					bounds = this.refreshBounds();
@@ -3158,13 +3449,18 @@ class Layout {
 				if (
 					newBreakToken &&
 					!newBreakToken.isFinished() &&
-					colIndex < columns.length - 1
+					colIndex < columns.length - 1 &&
+					// Forced-break tokens end the page (see the entry handoff
+					// above): the queued node was already yielded and must not
+					// be walked past.
+					!this.isForcedBreakToken(newBreakToken)
 				) {
 					dest = this.advanceColumn(
 						columns,
 						colIndex,
 						newBreakToken,
 						prevPage as HTMLElement | null,
+						source,
 					);
 					colIndex++;
 					bounds = this.refreshBounds();
@@ -3172,18 +3468,18 @@ class Layout {
 					continue;
 				}
 
-				if (!node || newBreakToken) {
-					if (newBreakToken) {
-						this.sweepResidualColumnOverflow(
-							wrapper,
-							source,
-							newBreakToken,
-							prevBreakToken,
-						);
-					}
-					this.relaxFinalSegmentRow(wrapper);
-					return new RenderResult(newBreakToken);
+			if (!node || newBreakToken) {
+				this.relaxFinalSegmentRow(wrapper);
+				if (newBreakToken) {
+					this.sweepResidualColumnOverflow(
+						wrapper,
+						source,
+						newBreakToken,
+						prevBreakToken,
+					);
 				}
+				return new RenderResult(newBreakToken);
+			}
 			}
 
 			// Should the Node be a shallow or deep clone?
@@ -3267,13 +3563,15 @@ class Layout {
 				if (
 					newBreakToken &&
 					!newBreakToken.isFinished() &&
-					colIndex < columns.length - 1
+					colIndex < columns.length - 1 &&
+					!this.isForcedBreakToken(newBreakToken)
 				) {
 					dest = this.advanceColumn(
 						columns,
 						colIndex,
 						newBreakToken,
 						prevPage as HTMLElement | null,
+						source,
 					);
 					colIndex++;
 					newBreakToken = undefined;
@@ -3288,6 +3586,10 @@ class Layout {
 
 		this.hooks &&
 			this.hooks.beforeRenderResult.trigger(newBreakToken, wrapper, this);
+		// Relax the final segment row's planned height before the sweep so
+		// the sweep measures the page's final column boxes (see the defer
+		// path above for why the order matters).
+		this.relaxFinalSegmentRow(wrapper);
 		if (newBreakToken) {
 			this.sweepResidualColumnOverflow(
 				wrapper,
@@ -3296,7 +3598,6 @@ class Layout {
 				prevBreakToken,
 			);
 		}
-		this.relaxFinalSegmentRow(wrapper);
 		return new RenderResult(newBreakToken);
 	}
 
@@ -3308,8 +3609,13 @@ class Layout {
 		let newBreakToken = new (BreakToken as any)(
 			node,
 			offset,
-			forcedBreakQueue,
 		) as BreakToken;
+		// BreakToken's constructor only accepts (node, overflowArray); the
+		// forced-break queue has to be attached explicitly or forced page
+		// breaks (e.g. a deferred column-span with break-before) are lost.
+		if (forcedBreakQueue.length) {
+			newBreakToken.setForcedBreakQueue(forcedBreakQueue.slice());
+		}
 		let breakHooks = this.hooks.onBreakToken.triggerSync(
 			newBreakToken,
 			undefined,
@@ -3379,6 +3685,97 @@ class Layout {
 	 *
 	 * @returns {void}
 	 */
+	/**
+	 * Re-orders children of containers inside a rebuilt overflow fragment so
+	 * they follow source document order. Residual sweeps can push overflow
+	 * entries out of order (a fragment's split skeleton is created before
+	 * later siblings are merged), which would otherwise render list items or
+	 * sibling blocks out of sequence. Only groups of element children that
+	 * all carry a data-ref mapping into the source are touched.
+	 *
+	 * @param {DocumentFragment} fragment - The rebuilt overflow fragment.
+	 * @param {DocumentFragment|Node|undefined} source - The source content.
+	 */
+	private reorderBySourceOrder(
+		fragment: DocumentFragment,
+		source?: DocumentFragment | Node,
+	): void {
+		if (!source) {
+			return;
+		}
+		const compare = (a: number[], b: number[]): number => {
+			const len = Math.min(a.length, b.length);
+			for (let i = 0; i < len; i++) {
+				if (a[i] !== b[i]) {
+					return a[i] - b[i];
+				}
+			}
+			return a.length - b.length;
+		};
+		const containers = [
+			fragment,
+			...Array.from(fragment.querySelectorAll("*")),
+		].filter((c) => !(c as Element).closest?.("table"));
+		for (const container of containers) {
+			const children = Array.from(container.children);
+			if (children.length < 2) {
+				continue;
+			}
+			// Only reorder when every element child is a ref-mapped clone AND
+			// the container holds no significant text: re-appending elements
+			// to sort them moves them after any text siblings, which would
+			// scramble mixed inline content (e.g. emphasized words inside a
+			// split paragraph). Pure element sequences — list items, sibling
+			// blocks — are the safe domain.
+			const hasText = Array.from(container.childNodes).some(
+				(n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
+			);
+			if (hasText) {
+				continue;
+			}
+			if (!children.every((c) => c.dataset && c.dataset.ref)) {
+				continue;
+			}
+			// Compute each child's source index path for stable comparison.
+			const paths: (number[] | null)[] = children.map((el) => {
+				const mapped = findElement(el, source as Node);
+				if (!mapped) {
+					return null;
+				}
+				const path: number[] = [];
+				let node: Node | null = mapped;
+				while (node && node.parentNode && node.parentNode.nodeType === 1) {
+					const parent = node.parentNode as Element;
+					const idx = Array.prototype.indexOf.call(parent.children, node);
+					if (idx === -1) {
+						return null;
+					}
+					path.unshift(idx);
+					node = parent;
+				}
+				return path;
+			});
+			if (paths.some((p) => p === null)) {
+				continue;
+			}
+			const paired = children.map((el, i) => ({
+				el,
+				path: paths[i] as number[],
+			}));
+			const needsSort = paired.some(
+				(p, i) => i > 0 && compare(paired[i - 1].path, p.path) > 0,
+			);
+			if (!needsSort) {
+				continue;
+			}
+			paired.sort((x, y) => compare(x.path, y.path));
+			// Re-append in source order (appendChild moves existing nodes).
+			for (const p of paired) {
+				container.appendChild(p.el);
+			}
+		}
+	}
+
 	addOverflowNodes(dest: HTMLElement, source: Node): void {
 		// Since we are modifying source as we go, we need to remember what
 		Array.from(source.childNodes).forEach((item) => {
@@ -3413,6 +3810,7 @@ class Layout {
 		dest: HTMLElement,
 		breakToken: BreakToken | undefined,
 		alreadyRendered?: DocumentFragment | Node,
+		source?: DocumentFragment | Node,
 	): void {
 		if (!dest) {
 			console.warn("paged-with-floats: addOverflowToPage called with null dest", new Error().stack);
@@ -3426,6 +3824,28 @@ class Layout {
 
 		// Ensure overflow content is rebuilt in source document order, even
 		// when residual sweeps appended out-of-order ranges to the token.
+		// Overflow nodes may be detached from the rendered tree (their range
+		// was already extracted), in which case compareDocumentPosition
+		// throws; fall back to comparing their mapped source elements via
+		// data-ref, whose order is stable regardless of extraction order.
+		const sourceOf = (node: Node | undefined | null): Node | undefined => {
+			if (!node) {
+				return undefined;
+			}
+			if (node.isConnected) {
+				return node;
+			}
+			const el = node.nodeType === 1 ? (node as Element) : node.parentElement;
+			const ref = el?.getAttribute?.("data-ref");
+			if (ref) {
+				try {
+					return findElement(el!, source as Node) || node;
+				} catch {
+					return node;
+				}
+			}
+			return node;
+		};
 		const sortedOverflows = breakToken.overflow.slice().sort((a, b) => {
 			if (!a?.node || !b?.node) {
 				return 0;
@@ -3433,8 +3853,10 @@ class Layout {
 			if (a.node === b.node) {
 				return (a.offset || 0) - (b.offset || 0);
 			}
+			const aSource = sourceOf(a.node);
+			const bSource = sourceOf(b.node);
 			try {
-				const pos = a.node.compareDocumentPosition(b.node);
+				const pos = aSource!.compareDocumentPosition(bSource!);
 				if (pos & Node.DOCUMENT_POSITION_FOLLOWING) {
 					return -1;
 				}
@@ -3505,6 +3927,8 @@ class Layout {
 				delete instance.dataset[camel];
 			});
 		});
+
+		this.reorderBySourceOrder(fragment!, source);
 
 		dest.appendChild(fragment!);
 
@@ -4176,6 +4600,7 @@ class Layout {
 		prevBreakToken: BreakToken | undefined,
 	): void {
 		let guard = 0;
+		console.warn("ZZZ sweepEnter sh=" + rendered.scrollHeight + " ch=" + rendered.clientHeight + " tagged=" + (rendered.dataset.overflowTagged ?? "-"));
 		// Extraction may have removed the container itself (e.g. an emptied
 		// paragraph that is then dropped); nothing left to sweep.
 		if (!rendered.isConnected) {
@@ -4191,13 +4616,26 @@ class Layout {
 			}
 
 			// Make freshly re-wrapped content visible to detection again.
+			// Range markers must be cleared along with the tagged flag: a
+			// range-start left behind by the walk's own collection (whose
+			// range-end partner was already extracted) otherwise skips every
+			// sibling after it, blinding the sweep to the actual overflow.
 			rendered
-				.querySelectorAll("[data-overflow-tagged]")
-				.forEach((el) => el.removeAttribute("data-overflow-tagged"));
+				.querySelectorAll(
+					"[data-overflow-tagged], [data-range-start-overflow], [data-range-end-overflow]",
+				)
+				.forEach((el) => {
+					el.removeAttribute("data-overflow-tagged");
+					el.removeAttribute("data-range-start-overflow");
+					el.removeAttribute("data-range-end-overflow");
+				});
 			rendered.removeAttribute("data-overflow-tagged");
+			rendered.removeAttribute("data-range-start-overflow");
+			rendered.removeAttribute("data-range-end-overflow");
 
 			try {
 				const range = this.findOverflow(rendered, bounds, source);
+				console.warn("ZZZ sweepPass range=" + (range ? "yes" : "none"));
 				if (!range) {
 					break;
 				}
@@ -6314,6 +6752,11 @@ class Layout {
 				startContainer.textContent =
 					startContainer.textContent +
 					((this.settings.hyphenGlyph as string) || "\u2011");
+				recordHyphenationWarning(
+					this.element
+						.closest(".paged_page")
+						?.getAttribute("data-page-number") || undefined,
+				);
 			}
 		}
 		this.invalidateBounds();

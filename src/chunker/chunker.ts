@@ -794,12 +794,68 @@ class Chunker {
 
 			if (!page || !emptyPage) {
 				if (breakToken) {
-					if (breakToken.overflow.length && breakToken.overflow[0].node) {
-						// Overflow.
-						await this.handleBreaks(breakToken.overflow[0].node);
+					// The break node decides the next page's side. Candidates,
+					// in order: queued nodes (only when the token carries no
+					// overflow — with overflow, the queued node's content tail
+					// must render first and the walk re-encounters the node
+					// afterwards), then the token node, then the first overflow
+					// node. With overflow, the token node only counts when it
+					// declares its own break-before (e.g. a column-span heading
+					// deferred by breakAt): a propagated previous-break-after on
+					// the overflow's own element belongs to content that is
+					// still continuing and must not blank the page early.
+					const sideValue = (
+						n: Node | undefined | null,
+						includePrevious = true,
+					): string | null => {
+						const el = n as HTMLElement;
+						if (!el || typeof el.dataset === "undefined") {
+							return null;
+						}
+						const values = includePrevious
+							? [el.dataset.breakBefore, el.dataset.previousBreakAfter]
+							: [el.dataset.breakBefore];
+						for (const v of values) {
+							if (
+								v === "left" ||
+								v === "right" ||
+								v === "recto" ||
+								v === "verso"
+							) {
+								return v;
+							}
+						}
+						return null;
+					};
+					let candidates: Node[];
+					let fallback: Node | undefined | null;
+					if (breakToken.overflow.length) {
+						// The queue re-fires after the overflow renders (the walk
+						// re-encounters the queued node), so a queued node's own
+						// side break must not ALSO fire here — that would blank
+						// the page before the overflow content renders. Only a
+						// break target with an EMPTY queue (e.g. a column-span
+						// heading deferred by breakAt, whose node is the break
+						// itself and is not re-queued) fires immediately.
+						const selfSide =
+							!breakToken.getForcedBreakQueue().length &&
+							sideValue(breakToken.node, false);
+						if (selfSide) {
+							candidates = [breakToken.node, breakToken.overflow[0]?.node];
+						} else {
+							candidates = [breakToken.overflow[0]?.node];
+						}
+						fallback = breakToken.overflow[0]?.node;
 					} else {
-						await this.handleBreaks(breakToken.node);
+						candidates = [
+							...breakToken.getForcedBreakQueue(),
+							breakToken.node,
+						];
+						fallback = breakToken.node;
 					}
+					let breakNode: Node | undefined | null =
+						candidates.find((n) => sideValue(n) !== null) ?? fallback;
+					await this.handleBreaks(breakNode);
 				} else {
 					await this.handleBreaks((content as Node).firstChild);
 				}

@@ -48,6 +48,9 @@ class BreakToken {
 		}
 
 		const otherQueue = otherBreakToken.getForcedBreakQueue();
+		if (this.breakNeededAt.length !== otherQueue.length) {
+			return false;
+		}
 		for (const index in this.breakNeededAt) {
 			if (!this.breakNeededAt[index].isEqualNode(otherQueue[index])) {
 				return false;

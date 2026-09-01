@@ -123,6 +123,10 @@ class InitialLetter extends Handler {
 		const span = document.createElement("span");
 		span.classList.add("paged_initial_letter");
 		span.textContent = letter;
+		// The line count lets the layout engine reserve room for the float
+		// (a drop cap's first line box spans all of it) when deciding whether
+		// a following block fits below a column-span heading.
+		span.dataset.pagedInitialLetterLines = String(size);
 		span.style.cssText =
 			"float: left; " +
 			"font-size: calc(" + size + " * 1lh); " +
