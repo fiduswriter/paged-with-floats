@@ -4600,7 +4600,6 @@ class Layout {
 		prevBreakToken: BreakToken | undefined,
 	): void {
 		let guard = 0;
-		console.warn("ZZZ sweepEnter sh=" + rendered.scrollHeight + " ch=" + rendered.clientHeight + " tagged=" + (rendered.dataset.overflowTagged ?? "-"));
 		// Extraction may have removed the container itself (e.g. an emptied
 		// paragraph that is then dropped); nothing left to sweep.
 		if (!rendered.isConnected) {
@@ -4635,7 +4634,6 @@ class Layout {
 
 			try {
 				const range = this.findOverflow(rendered, bounds, source);
-				console.warn("ZZZ sweepPass range=" + (range ? "yes" : "none"));
 				if (!range) {
 					break;
 				}

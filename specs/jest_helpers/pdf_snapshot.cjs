@@ -61,7 +61,14 @@ function toMatchPDFSnapshot(received, page = 1) {
 		// rimrafSync(pdfPath);
 	}
 
-	const config = {};
+	// PDF rasterization differs slightly between ghostscript / chromium
+	// versions and host platforms (antialiasing, glyph hinting). A small
+	// per-page tolerance keeps these environment-level differences from
+	// failing the suite while still catching real layout regressions.
+	const config = {
+		failureThreshold: 0.01,
+		failureThresholdType: "percent",
+	};
 
 	return toMatchImageSnapshot.apply(this, [pdfImage, config]);
 }
