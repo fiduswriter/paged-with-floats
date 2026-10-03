@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/fiduswriter/paged-with-floats/actions/workflows/ci.yml/badge.svg)](https://github.com/fiduswriter/paged-with-floats/actions/workflows/ci.yml)
 
+**DEPRECATED:** This package has been merged into <https://www.github.com/fiduswriter/paginate-for-print/>
+
+
 **Live demos:** <https://fiduswriter.github.io/paged-with-floats/>
 
 paged-with-floats
